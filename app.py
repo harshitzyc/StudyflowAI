@@ -2,6 +2,7 @@ import streamlit as st
 from pathlib import Path
 import pandas as pd
 import json
+import os  # <-- MOVED TO TOP SO IT'S ALWAYS AVAILABLE
 
 # --- Universal Secret Loader ---
 try:
@@ -9,7 +10,6 @@ try:
     model = st.secrets.get("GEMINI_MODEL", "gemini-flash-latest")
 except Exception:
     from dotenv import load_dotenv
-    import os
     load_dotenv()
     api_key = os.getenv("GEMINI_API_KEY", "")
     model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
@@ -18,6 +18,7 @@ if not api_key:
     st.error("🔑 GEMINI_API_KEY missing. Add it to .env or Streamlit Secrets.")
     st.stop()
 
+# Now this will work in BOTH environments
 os.environ["GEMINI_API_KEY"] = api_key
 os.environ["GEMINI_MODEL"] = model
 
