@@ -1,12 +1,21 @@
 import streamlit as st
+from pathlib import Path
+import os
+
+# Load .env locally; Streamlit Secrets override these automatically in the cloud
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass 
+
 from services.pyq_service import PYQService
 from services.planner_service import PlannerService
-from pathlib import Path
 
 # --- Page Config ---
 st.set_page_config(page_title="StudyFlow AI", page_icon="🎓", layout="wide")
 
-# --- Initialize Services (Cached so it only runs once) ---
+# --- Initialize Services (Cached so it only runs once per session) ---
 @st.cache_resource
 def load_services():
     base_dir = Path(__file__).resolve().parent
@@ -16,6 +25,7 @@ def load_services():
     return pyq, planner
 
 pyq_service, planner_service = load_services()
+
 
 # --- Header ---
 st.title("🎓 Study what the exam actually asks.")
