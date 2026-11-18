@@ -1,10 +1,9 @@
 import streamlit as st
 from pathlib import Path
-import pandas as pd
 import json
-import os  # <-- MOVED TO TOP SO IT'S ALWAYS AVAILABLE
+import os
 
-# --- Universal Secret Loader ---
+# --- Universal Secret Loader (Works locally & on Streamlit Cloud) ---
 try:
     api_key = st.secrets.get("GEMINI_API_KEY", "")
     model = st.secrets.get("GEMINI_MODEL", "gemini-flash-latest")
@@ -18,7 +17,7 @@ if not api_key:
     st.error("🔑 GEMINI_API_KEY missing. Add it to .env or Streamlit Secrets.")
     st.stop()
 
-# Now this will work in BOTH environments
+# Inject env vars so backend services work identically in both environments
 os.environ["GEMINI_API_KEY"] = api_key
 os.environ["GEMINI_MODEL"] = model
 
@@ -27,32 +26,16 @@ from services.planner_service import PlannerService
 
 st.set_page_config(page_title="StudyFlow AI", page_icon="🎓", layout="wide")
 
-# Inject Custom CSS to match your original branding
-st.markdown("""
-<style>
-    .main { background-color: #f8f9fa; }
-    h1, h2, h3 { font-family: 'Fraunces', serif !important; color: #14213D !important; }
-    .stMetric { background-color: white; border-radius: 10px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    div[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #e9ecef; }
-    .stButton>button { background-color: #FFB703 !important; color: #14213D !important; font-weight: bold; border: none !important; }
-    .stButton>button:hover { background-color: #e5a502 !important; }
-</style>
-""", unsafe_allow_html=True)
-
-# --- Initialize Services ---
+# --- Initialize Services (Cached per session) ---
 @st.cache_resource
 def load_services():
     base_dir = Path(__file__).resolve().parent
     pyq = PYQService(base_dir / "syllabus.pdf", base_dir / "pyq.pdf")
     planner = PlannerService(base_dir / "syllabus.pdf", base_dir / "pyq.pdf")
-    planner.pyq_service = pyq
+    planner.pyq_service = pyq  # Share cache across services
     return pyq, planner
 
 pyq_service, planner_service = load_services()
-
-# --- Header ---
-st.title("🎓 Study what the exam actually asks.")
-st.caption("Maps previous-year questions to your syllabus and splits study hours by real weightage.")
 
 # --- Sidebar Controls ---
 with st.sidebar:
@@ -64,55 +47,51 @@ with st.sidebar:
         st.cache_resource.clear()
         st.rerun()
 
-# --- Fetch Live Data ---
-try:
-    weightages = pyq_service.get_unit_weightage()
-    frequencies = pyq_service.get_topic_frequencies()
-    plan = planner_service.generate_study_plan(total_study_hours=hours)
-except Exception as e:
-    st.error(f"❌ Failed to fetch data: {e}")
+# --- Fetch Live Data from Your Existing Backend Logic ---
+weightages = pyq_service.get_unit_weightage()
+frequencies = pyq_service.get_topic_frequencies()
+plan = planner_service.generate_study_plan(total_study_hours=hours)
+
+# --- Read Your Original Dashboard HTML ---
+base_dir = Path(__file__).resolve().parent
+dashboard_path = base_dir / "templates" / "dashboard.html"
+
+if not dashboard_path.exists():
+    st.error("❌ dashboard.html not found. Ensure templates/dashboard.html exists in repo.")
     st.stop()
 
-# --- Dashboard Layout ---
-col1, col2 = st.columns(2)
+with open(dashboard_path, "r", encoding="utf-8") as f:
+    dashboard_html = f.read()
 
-with col1:
-    st.subheader("📊 Unit Weightage Analysis")
-    if weightages:
-        df_w = pd.DataFrame(list(weightages.items()), columns=["Unit", "Question Count"])
-        st.bar_chart(df_w.set_index("Unit"), height=300, color="#4A90E2")
-    else:
-        st.info("No weightage data available.")
+# --- Inject Live Data Directly Into Your Existing Frontend ---
+data_script = f"""
+<script>
+// Override fetch ONLY for your API endpoints to serve live Python data
+const LIVE_DATA = {{
+    weightages: {json.dumps(weightages)},
+    frequencies: {json.dumps(frequencies)},
+    plan: {json.dumps(plan)},
+    hours: {hours}
+}};
 
-with col2:
-    st.subheader("🎯 PYQ Topic Frequencies")
-    if frequencies:
-        sorted_freq = dict(sorted(frequencies.items(), key=lambda x: x[1], reverse=True)[:8])
-        df_f = pd.DataFrame(list(sorted_freq.items()), columns=["Topic", "Frequency"])
-        st.bar_chart(df_f.set_index("Topic"), height=300, color="#FFB703")
-    else:
-        st.info("No frequency data available.")
+const originalFetch = window.fetch;
+window.fetch = async (url, opts) => {{
+    const urlStr = typeof url === 'string' ? url : url.url;
+    if (urlStr.includes('/weightages')) 
+        return {{ ok: true, json: () => Promise.resolve(LIVE_DATA.weightages) }};
+    if (urlStr.includes('/frequencies')) 
+        return {{ ok: true, json: () => Promise.resolve(LIVE_DATA.frequencies) }};
+    if (urlStr.includes('/plan')) 
+        return {{ ok: true, json: () => Promise.resolve(LIVE_DATA.plan) }};
+    return originalFetch(url, opts); // Let all other requests (CSS/JS/images) pass through normally
+}};
+</script>
+"""
 
-st.divider()
-st.subheader(f"📅 Recommended Study Plan ({hours} Hours)")
+# Inject script BEFORE </head> so it loads before dashboard.js executes
+final_html = dashboard_html.replace("</head>", f"{data_script}</head>")
 
-if isinstance(plan, dict) and "message" not in plan:
-    df_plan = pd.DataFrame.from_dict(plan, orient='index').reset_index()
-    df_plan.columns = ['Unit', 'PYQs', 'Weightage (%)', 'Recommended Hours']
-    
-    st.dataframe(
-        df_plan, 
-        column_config={
-            "Unit": st.column_config.TextColumn("Unit", width="medium"),
-            "PYQs": st.column_config.NumberColumn("PYQs", format="%d"),
-            "Weightage (%)": st.column_config.NumberColumn("Weightage", format="%.1f%%"),
-            "Recommended Hours": st.column_config.NumberColumn("Hours", format="%.1f h")
-        },
-        hide_index=True,
-        use_container_width=True,
-        height=400
-    )
-else:
-    st.warning(plan.get("message", "Could not generate plan."))
+# Render your EXACT frontend inside Streamlit
+st.components.v1.html(final_html, height=1400, scrolling=True)
 
 st.caption("Built with Streamlit • Gemini AI • pypdf")
