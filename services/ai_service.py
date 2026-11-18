@@ -1,25 +1,32 @@
 import os
 import json
-from dotenv import load_dotenv
+
+# Universal secret loader: Works locally (.env) AND on Streamlit Cloud (Secrets.toml)
+try:
+    import streamlit as st
+    # If running on Streamlit, pull secrets from the dashboard config
+    api_key = st.secrets.get("GEMINI_API_KEY", "")
+    model = st.secrets.get("GEMINI_MODEL", "gemini-flash-latest")
+except ImportError:
+    # If running locally, fall back to standard .env loading
+    from dotenv import load_dotenv
+    load_dotenv()
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+
+if not api_key:
+    raise RuntimeError("GEMINI_API_KEY missing. Add it to .env locally or Streamlit Secrets in the cloud.")
+
+MODEL = model
+
 from google import genai
 from google.genai import types
 
-load_dotenv()
-
-# gemini-2.0-flash was retired; the model is now configurable via .env
-MODEL = "gemini-flash-latest"
-
-# ── Create the client ONCE globally so the connection doesn't close ────────
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    raise RuntimeError("GEMINI_API_KEY missing. Check your .env file.")
-
+# Create client once globally to prevent connection closures
 client = genai.Client(
     api_key=api_key,
     http_options=types.HttpOptions(timeout=60000),
 )
-# ──────────────────────────────────────────────────────────────────────────
-
 
 def _generate_json(prompt):
     try:
