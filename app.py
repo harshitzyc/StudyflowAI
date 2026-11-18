@@ -1,13 +1,13 @@
 import streamlit as st
 from pathlib import Path
+import pandas as pd
 import json
 
-# Universal secret loader (Works locally & on Streamlit Cloud)
+# --- Universal Secret Loader ---
 try:
-    import streamlit as st
     api_key = st.secrets.get("GEMINI_API_KEY", "")
     model = st.secrets.get("GEMINI_MODEL", "gemini-flash-latest")
-except ImportError:
+except Exception:
     from dotenv import load_dotenv
     import os
     load_dotenv()
@@ -15,20 +15,30 @@ except ImportError:
     model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
 if not api_key:
-    st.error("GEMINI_API_KEY missing. Add it to .env or Streamlit Secrets.")
+    st.error("🔑 GEMINI_API_KEY missing. Add it to .env or Streamlit Secrets.")
     st.stop()
 
-# Inject env vars so services can use them
-import os
 os.environ["GEMINI_API_KEY"] = api_key
 os.environ["GEMINI_MODEL"] = model
 
 from services.pyq_service import PYQService
 from services.planner_service import PlannerService
-from pathlib import Path
 
 st.set_page_config(page_title="StudyFlow AI", page_icon="🎓", layout="wide")
 
+# Inject Custom CSS to match your original branding
+st.markdown("""
+<style>
+    .main { background-color: #f8f9fa; }
+    h1, h2, h3 { font-family: 'Fraunces', serif !important; color: #14213D !important; }
+    .stMetric { background-color: white; border-radius: 10px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    div[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #e9ecef; }
+    .stButton>button { background-color: #FFB703 !important; color: #14213D !important; font-weight: bold; border: none !important; }
+    .stButton>button:hover { background-color: #e5a502 !important; }
+</style>
+""", unsafe_allow_html=True)
+
+# --- Initialize Services ---
 @st.cache_resource
 def load_services():
     base_dir = Path(__file__).resolve().parent
@@ -38,6 +48,10 @@ def load_services():
     return pyq, planner
 
 pyq_service, planner_service = load_services()
+
+# --- Header ---
+st.title("🎓 Study what the exam actually asks.")
+st.caption("Maps previous-year questions to your syllabus and splits study hours by real weightage.")
 
 # --- Sidebar Controls ---
 with st.sidebar:
@@ -50,34 +64,54 @@ with st.sidebar:
         st.rerun()
 
 # --- Fetch Live Data ---
-weightages = pyq_service.get_unit_weightage()
-frequencies = pyq_service.get_topic_frequencies()
-plan = planner_service.generate_study_plan(total_study_hours=hours)
+try:
+    weightages = pyq_service.get_unit_weightage()
+    frequencies = pyq_service.get_topic_frequencies()
+    plan = planner_service.generate_study_plan(total_study_hours=hours)
+except Exception as e:
+    st.error(f"❌ Failed to fetch data: {e}")
+    st.stop()
 
-# --- Read Original Dashboard HTML ---
-base_dir = Path(__file__).resolve().parent
-html_path = base_dir / "templates" / "dashboard.html"
-if html_path.exists():
-    with open(html_path, "r", encoding="utf-8") as f:
-        dashboard_html = f.read()
+# --- Dashboard Layout ---
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("📊 Unit Weightage Analysis")
+    if weightages:
+        df_w = pd.DataFrame(list(weightages.items()), columns=["Unit", "Question Count"])
+        st.bar_chart(df_w.set_index("Unit"), height=300, color="#4A90E2")
+    else:
+        st.info("No weightage data available.")
+
+with col2:
+    st.subheader("🎯 PYQ Topic Frequencies")
+    if frequencies:
+        sorted_freq = dict(sorted(frequencies.items(), key=lambda x: x[1], reverse=True)[:8])
+        df_f = pd.DataFrame(list(sorted_freq.items()), columns=["Topic", "Frequency"])
+        st.bar_chart(df_f.set_index("Topic"), height=300, color="#FFB703")
+    else:
+        st.info("No frequency data available.")
+
+st.divider()
+st.subheader(f"📅 Recommended Study Plan ({hours} Hours)")
+
+if isinstance(plan, dict) and "message" not in plan:
+    df_plan = pd.DataFrame.from_dict(plan, orient='index').reset_index()
+    df_plan.columns = ['Unit', 'PYQs', 'Weightage (%)', 'Recommended Hours']
+    
+    st.dataframe(
+        df_plan, 
+        column_config={
+            "Unit": st.column_config.TextColumn("Unit", width="medium"),
+            "PYQs": st.column_config.NumberColumn("PYQs", format="%d"),
+            "Weightage (%)": st.column_config.NumberColumn("Weightage", format="%.1f%%"),
+            "Recommended Hours": st.column_config.NumberColumn("Hours", format="%.1f h")
+        },
+        hide_index=True,
+        use_container_width=True,
+        height=400
+    )
 else:
-    dashboard_html = "<h1>Dashboard template not found</h1>"
-
-# --- Inject Live Data into HTML & Render ---
-# We replace placeholder comments in your HTML with actual JSON data
-data_script = f"""
-<script>
-window.STUDYFLOW_DATA = {{
-    weightages: {json.dumps(weightages)},
-    frequencies: {json.dumps(frequencies)},
-    plan: {json.dumps(plan)},
-    hours: {hours}
-}};
-</script>
-"""
-
-final_html = dashboard_html.replace("</head>", f"{data_script}</head>")
-
-st.components.v1.html(final_html, height=1200, scrolling=True)
+    st.warning(plan.get("message", "Could not generate plan."))
 
 st.caption("Built with Streamlit • Gemini AI • pypdf")
