@@ -38,9 +38,8 @@
           <li class="nav-item">
             <a class="nav-link {% if request.url.path == '/dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">Dashboard</a>
           </li>
-          <li class="nav-item"><a class="nav-link" href="/docs">API docs</a></li>
           <li class="nav-item">
-            <a class="nav-link" href="https://github.com/adityakumar938/Studyflow" target="_blank" rel="noopener">
+            <a class="nav-link" href="https://github.com/harshitzyc/StudyflowAI" target="_blank" rel="noopener">
               GitHub <i class="bi bi-box-arrow-up-right small"></i>
             </a>
           </li>
@@ -59,7 +58,7 @@
   <footer class="sf-footer mt-auto">
     <div class="container py-5">
       <div class="row g-4">
-        <div class="col-lg-5">
+        <div class="col-lg-6">
           <div class="d-flex align-items-center gap-2 mb-2 sf-footer-brand">
             <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
               <rect width="32" height="32" rx="8" fill="#FFB703"/>
@@ -68,34 +67,28 @@
             </svg>
             <span class="font-display fw-bold">StudyFlow</span>
           </div>
-          <p class="small sf-footer-muted mb-3">Adaptive academic planning &amp; PYQ intelligence — built by students, for exam season.</p>
+          <p class="small sf-footer-muted mb-3">Adaptive academic planning &amp; PYQ intelligence — built for exam season.</p>
           <div class="d-flex flex-wrap gap-2">
-            <span class="sf-stack-chip">FastAPI</span><span class="sf-stack-chip">Gemini</span>
-            <span class="sf-stack-chip">pypdf</span><span class="sf-stack-chip">ReportLab</span>
+            <span class="sf-stack-chip">FastAPI</span>
+            <span class="sf-stack-chip">Gemini</span>
+            <span class="sf-stack-chip">pypdf</span>
+            <span class="sf-stack-chip">ReportLab</span>
             <span class="sf-stack-chip">Bootstrap 5</span>
           </div>
         </div>
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-lg-6">
           <h3 class="sf-footer-head">Explore</h3>
           <ul class="list-unstyled small mb-0">
             <li><a href="{{ url_for('home') }}">Home</a></li>
             <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
             <li><a href="/docs">API documentation</a></li>
-            <li><a href="https://github.com/adityakumar938/Studyflow" target="_blank" rel="noopener">GitHub repository</a></li>
-          </ul>
-        </div>
-        <div class="col-6 col-lg-4">
-          <h3 class="sf-footer-head">Build team · CSE-AI</h3>
-          <ul class="list-unstyled small sf-footer-muted mb-0">
-            <li>Member 1 — Backend &amp; database <span class="sf-status-dot sf-dot-pending"></span></li>
-            <li>Member 2 — Frontend &amp; dashboard <span class="sf-status-dot sf-dot-live"></span></li>
-            <li>Member 3 — AI services &amp; API <span class="sf-status-dot sf-dot-live"></span></li>
+            <li><a href="https://github.com/harshitzyc/StudyflowAI" target="_blank" rel="noopener">GitHub repository</a></li>
           </ul>
         </div>
       </div>
       <hr class="sf-footer-hr">
       <div class="d-flex flex-wrap justify-content-between gap-2 small sf-footer-muted">
-        <span>© {{ current_year }} StudyFlow · Semester Mini-Project</span>
+        <span>© {{ current_year }} StudyFlow</span>
         <span>Extract → Map → Weight → Plan</span>
       </div>
     </div>

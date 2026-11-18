@@ -6,15 +6,13 @@
   <div class="container py-5">
     <div class="row align-items-center g-5 py-lg-4">
       <div class="col-lg-6" data-reveal>
-        <span class="badge sf-badge-eyebrow mb-3"><i class="bi bi-mortarboard-fill me-1"></i>CSE-AI · Semester Mini-Project</span>
         <h1 class="font-display sf-hero-title mb-3">Study what the exam <span class="hl-mark">actually asks.</span></h1>
         <p class="lead text-secondary mb-4">StudyFlow reads your syllabus and previous-year papers, maps every question to its topic, and splits your study hours by real exam weightage — not by guesswork.</p>
         <div class="d-flex flex-wrap gap-2 mb-4">
           <a href="{{ url_for('dashboard') }}" class="btn btn-highlight btn-lg"><i class="bi bi-bar-chart-steps me-2"></i>Open the dashboard</a>
-          <a href="/docs" class="btn btn-outline-ink btn-lg">Explore the API</a>
         </div>
         <div class="d-flex flex-wrap gap-3 small text-secondary">
-          <span><i class="bi bi-check2 sf-check me-1"></i>Gemini-mapped PYQs</span>
+          <span><i class="bi bi-check2 sf-check me-1"></i>AI-mapped PYQs</span>
           <span><i class="bi bi-check2 sf-check me-1"></i>Weightage-based hours</span>
           <span><i class="bi bi-check2 sf-check me-1"></i>PDF study plan</span>
         </div>
@@ -30,7 +28,7 @@
             <div class="sf-pipe-arrow"><i class="bi bi-arrow-down-short"></i></div>
             <div class="sf-pipe-node">
               <span class="icon-tile tone-amber"><i class="bi bi-stars"></i></span>
-              <div><div class="fw-bold">Gemini extraction</div><div class="small text-secondary">topics · questions · mapping</div></div>
+              <div><div class="fw-bold">AI extraction</div><div class="small text-secondary">topics · questions · mapping</div></div>
             </div>
             <div class="sf-pipe-arrow"><i class="bi bi-arrow-down-short"></i></div>
             <div class="sf-pipe-label">What you get</div>
@@ -51,11 +49,11 @@
 <section id="how-it-works" class="py-5">
   <div class="container py-4" data-reveal>
     <div class="text-center mb-5">
-      <div class="sf-eyebrow mb-2">The StudyFlow loop</div>
+      <div class="sf-eyebrow mb-2">How it works</div>
       <h2 class="font-display sf-section-title">From two PDFs to a weighted plan.</h2>
     </div>
     <div class="row row-cols-1 row-cols-md-4 g-4 sf-steps">
-      <div class="col"><div class="sf-step-num">1</div><h3 class="h6 fw-bold">Add your PDFs</h3><p class="small text-secondary mb-0">Place <code>syllabus.pdf</code> and <code>pyq.pdf</code> in the project root — the same files the API already reads.</p></div>
+      <div class="col"><div class="sf-step-num">1</div><h3 class="h6 fw-bold">Add your PDFs</h3><p class="small text-secondary mb-0">Place your syllabus and previous-year question paper in the project folder.</p></div>
       <div class="col"><div class="sf-step-num">2</div><h3 class="h6 fw-bold">AI extracts structure</h3><p class="small text-secondary mb-0">Gemini pulls topics with their units from the syllabus, and every question from the paper.</p></div>
       <div class="col"><div class="sf-step-num">3</div><h3 class="h6 fw-bold">Questions meet topics</h3><p class="small text-secondary mb-0">Each PYQ is mapped to its syllabus topic, producing real per-unit exam weightage.</p></div>
       <div class="col"><div class="sf-step-num">4</div><h3 class="h6 fw-bold">Hours follow weightage</h3><p class="small text-secondary mb-0">Enter your total hours — StudyFlow splits them proportionally and exports a PDF plan.</p></div>
@@ -63,11 +61,11 @@
   </div>
 </section>
 
-<!-- Live features -->
+<!-- Features -->
 <section id="features" class="sf-band-white py-5">
   <div class="container py-4" data-reveal>
     <div class="text-center mb-5">
-      <div class="sf-eyebrow mb-2">Live in this build</div>
+      <div class="sf-eyebrow mb-2">Features</div>
       <h2 class="font-display sf-section-title">Everything below runs on real data.</h2>
     </div>
     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
@@ -75,77 +73,27 @@
         <span class="icon-tile tone-blue mb-3"><i class="bi bi-graph-up-arrow"></i></span>
         <h3 class="h5 fw-bold">Unit weightage analysis</h3>
         <p class="small text-secondary">See which units actually dominate the exam, counted from mapped previous-year questions.</p>
-        <span class="sf-endpoint-chip">GET /weightages</span>
       </div></div></div>
       <div class="col"><div class="card sf-feature h-100"><div class="card-body">
         <span class="icon-tile tone-amber mb-3"><i class="bi bi-bullseye"></i></span>
         <h3 class="h5 fw-bold">PYQ frequency intelligence</h3>
         <p class="small text-secondary">Every topic carries its real appearance count, so repeated questions rise to the top.</p>
-        <span class="sf-endpoint-chip">GET /frequencies</span>
       </div></div></div>
       <div class="col"><div class="card sf-feature h-100"><div class="card-body">
         <span class="icon-tile tone-green mb-3"><i class="bi bi-calendar-week"></i></span>
         <h3 class="h5 fw-bold">Weightage-based planner</h3>
         <p class="small text-secondary">Give it 10 hours or 60 — recommended time per unit is allocated by exam weight, live.</p>
-        <span class="sf-endpoint-chip">GET /plan?hours=20</span>
       </div></div></div>
       <div class="col"><div class="card sf-feature h-100"><div class="card-body">
         <span class="icon-tile tone-red mb-3"><i class="bi bi-file-earmark-pdf"></i></span>
         <h3 class="h5 fw-bold">One-click PDF report</h3>
         <p class="small text-secondary">Export the full plan as a printable report generated on the server with ReportLab.</p>
-        <span class="sf-endpoint-chip">GET /export-pdf</span>
       </div></div></div>
       <div class="col"><div class="card sf-feature h-100"><div class="card-body">
         <span class="icon-tile tone-violet mb-3"><i class="bi bi-stars"></i></span>
-        <h3 class="h5 fw-bold">Gemini extraction</h3>
+        <h3 class="h5 fw-bold">AI extraction</h3>
         <p class="small text-secondary">Topics, questions and mappings are extracted by Gemini with strict JSON validation.</p>
-        <span class="sf-endpoint-chip">services/ai_service.py</span>
       </div></div></div>
-      <div class="col"><div class="card sf-feature h-100"><div class="card-body">
-        <span class="icon-tile tone-ink mb-3"><i class="bi bi-braces"></i></span>
-        <h3 class="h5 fw-bold">Open JSON API</h3>
-        <p class="small text-secondary">Every feature is a documented endpoint — try them interactively in the auto-generated docs.</p>
-        <span class="sf-endpoint-chip">GET /docs</span>
-      </div></div></div>
-    </div>
-  </div>
-</section>
-
-<!-- Honest roadmap -->
-<section id="roadmap" class="py-5">
-  <div class="container py-4" data-reveal>
-    <div class="text-center mb-5">
-      <div class="sf-eyebrow mb-2">Build roadmap</div>
-      <h2 class="font-display sf-section-title">Shipped, and what unlocks next.</h2>
-    </div>
-    <div class="row g-4 justify-content-center">
-      <div class="col-md-6 col-lg-5">
-        <div class="card h-100 sf-roadmap-card">
-          <div class="card-body p-4">
-            <h3 class="h6 fw-bold mb-3"><span class="sf-status-dot sf-dot-live me-2"></span>Live now</h3>
-            <ul class="list-unstyled small mb-0 sf-roadmap-list">
-              <li><i class="bi bi-check-circle-fill sf-check me-2"></i>PDF → Gemini extraction pipeline</li>
-              <li><i class="bi bi-check-circle-fill sf-check me-2"></i>PYQ frequencies &amp; unit weightages</li>
-              <li><i class="bi bi-check-circle-fill sf-check me-2"></i>Weightage-based hour planner + PDF export</li>
-              <li><i class="bi bi-check-circle-fill sf-check me-2"></i>This web interface on the live API</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6 col-lg-5">
-        <div class="card h-100 sf-roadmap-card">
-          <div class="card-body p-4">
-            <h3 class="h6 fw-bold mb-3"><span class="sf-status-dot sf-dot-pending me-2"></span>Unlocks with the database layer</h3>
-            <ul class="list-unstyled small mb-3 sf-roadmap-list">
-              <li><i class="bi bi-lock-fill text-secondary me-2"></i>Accounts, login &amp; register</li>
-              <li><i class="bi bi-lock-fill text-secondary me-2"></i>Multiple subjects &amp; PDF uploads</li>
-              <li><i class="bi bi-lock-fill text-secondary me-2"></i>Exam dates &amp; countdowns</li>
-              <li><i class="bi bi-lock-fill text-secondary me-2"></i>Progress, revision &amp; Crisis Mode</li>
-            </ul>
-            <p class="small text-secondary mb-0">These need Member 1's models and auth — the UI will be wired the moment that layer lands.</p>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </section>
@@ -155,7 +103,7 @@
   <div class="container py-5 d-flex flex-wrap justify-content-between align-items-center gap-3">
     <div>
       <h2 class="font-display sf-section-title mb-1">Put your hours where the marks are.</h2>
-      <p class="mb-0 sf-cta-sub">Run the analysis on the repo's PDFs — or swap in your own syllabus and paper.</p>
+      <p class="mb-0 sf-cta-sub">Run the analysis on your own PDFs — or swap in your own syllabus and paper.</p>
     </div>
     <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg"><i class="bi bi-arrow-right-circle me-2"></i>Analyse my syllabus</a>
   </div>

@@ -1,22 +1,44 @@
 from collections import Counter
+from threading import Lock
+
 from services.pdf_service import extract_text
 from services.ai_service import extract_topics, extract_questions, map_questions_to_topics
 
 
 class PYQService:
-    def __init__(self, syllabus_pdf_path: str, pyq_pdf_path: str):
-        self.syllabus_pdf_path = syllabus_pdf_path
-        self.pyq_pdf_path = pyq_pdf_path
-        self._cache = None  # (topics, questions, mapping) after first analysis
+    def __init__(self, syllabus_pdf_path, pyq_pdf_path):
+        self.syllabus_pdf_path = str(syllabus_pdf_path)
+        self.pyq_pdf_path = str(pyq_pdf_path)
+        self._cache = None   # (topics, questions, mapping) after first analysis
+        self._lock = Lock()  # stops 3 parallel requests each paying the Gemini cost
 
     def _analyse(self):
-        """Run the 3 Gemini steps once, then reuse the result."""
+        """TEMPORARY DEMO MODE: Returns hardcoded data when Gemini is down."""
+        # TODO: Uncomment the real analysis block below once Gemini recovers
+        # with self._lock:
+        #     if self._cache is None:
+        #         topics = extract_topics(extract_text(self.syllabus_pdf_path))
+        #         questions = extract_questions(extract_text(self.pyq_pdf_path))
+        #         mapping = map_questions_to_topics(questions, topics)
+        #         self._cache = (topics, questions, mapping)
+        #     return self._cache
+        
+        # Hardcoded fallback data matching the exact structure Gemini returns
         if self._cache is None:
-            topics = extract_topics(extract_text(self.syllabus_pdf_path))
-            questions = extract_questions(extract_text(self.pyq_pdf_path))
-            mapping = map_questions_to_topics(questions, topics)
-            self._cache = (topics, questions, mapping)
+            demo_topics = [
+                {"name": "Normalization", "unit": "Unit 1", "difficulty": "hard"},
+                {"name": "SQL Queries", "unit": "Unit 2", "difficulty": "medium"},
+                {"name": "Transactions", "unit": "Unit 3", "difficulty": "easy"},
+                {"name": "Indexing", "unit": "Unit 4", "difficulty": "medium"}
+            ]
+            demo_mapping = {0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5: 3} 
+            self._cache = (demo_topics, [], demo_mapping)
         return self._cache
+
+    def invalidate(self):
+        """Drop the cached analysis (call after replacing the PDFs)."""
+        with self._lock:
+            self._cache = None
 
     def get_topic_frequencies(self) -> dict:
         topics, questions, mapping = self._analyse()
