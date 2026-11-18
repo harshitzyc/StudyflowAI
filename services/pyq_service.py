@@ -13,8 +13,8 @@ class PYQService:
         self._lock = Lock()  # stops 3 parallel requests each paying the Gemini cost
 
     def _analyse(self):
-        """TEMPORARY DEMO MODE: Returns hardcoded data when Gemini is down."""
-        # TODO: Uncomment the real analysis block below once Gemini recovers
+        """DEMO MODE: Returns hardcoded data when Gemini API is unavailable."""
+        # TODO: Uncomment the real analysis block below once Google API recovers
         # with self._lock:
         #     if self._cache is None:
         #         topics = extract_topics(extract_text(self.syllabus_pdf_path))
@@ -26,11 +26,12 @@ class PYQService:
         # Hardcoded fallback data matching the exact structure Gemini returns
         if self._cache is None:
             demo_topics = [
-                {"name": "Normalization", "unit": "Unit 1", "difficulty": "hard"},
-                {"name": "SQL Queries", "unit": "Unit 2", "difficulty": "medium"},
-                {"name": "Transactions", "unit": "Unit 3", "difficulty": "easy"},
-                {"name": "Indexing", "unit": "Unit 4", "difficulty": "medium"}
+                {"name": "Normalization & ER Models", "unit": "Unit 1", "difficulty": "hard"},
+                {"name": "Relational Algebra & SQL", "unit": "Unit 2", "difficulty": "medium"},
+                {"name": "Transactions & Concurrency", "unit": "Unit 3", "difficulty": "easy"},
+                {"name": "Indexing & Query Optimization", "unit": "Unit 4", "difficulty": "medium"}
             ]
+            # Maps question indices to topic indices (-1 means no match)
             demo_mapping = {0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5: 3} 
             self._cache = (demo_topics, [], demo_mapping)
         return self._cache
