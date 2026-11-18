@@ -1,38 +1,43 @@
 import streamlit as st
 from pathlib import Path
-import os
+import json
 
-# Load .env locally; Streamlit Secrets override these automatically in the cloud
+# Universal secret loader (Works locally & on Streamlit Cloud)
 try:
-    from dotenv import load_dotenv
-    load_dotenv()
+    import streamlit as st
+    api_key = st.secrets.get("GEMINI_API_KEY", "")
+    model = st.secrets.get("GEMINI_MODEL", "gemini-flash-latest")
 except ImportError:
-    pass 
+    from dotenv import load_dotenv
+    import os
+    load_dotenv()
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+
+if not api_key:
+    st.error("GEMINI_API_KEY missing. Add it to .env or Streamlit Secrets.")
+    st.stop()
+
+# Inject env vars so services can use them
+import os
+os.environ["GEMINI_API_KEY"] = api_key
+os.environ["GEMINI_MODEL"] = model
 
 from services.pyq_service import PYQService
 from services.planner_service import PlannerService
+from pathlib import Path
 
-# --- Page Config ---
 st.set_page_config(page_title="StudyFlow AI", page_icon="🎓", layout="wide")
 
-# --- Initialize Services (Cached so it only runs once per session) ---
 @st.cache_resource
 def load_services():
     base_dir = Path(__file__).resolve().parent
     pyq = PYQService(base_dir / "syllabus.pdf", base_dir / "pyq.pdf")
     planner = PlannerService(base_dir / "syllabus.pdf", base_dir / "pyq.pdf")
-    planner.pyq_service = pyq  # Share the cache
+    planner.pyq_service = pyq
     return pyq, planner
 
 pyq_service, planner_service = load_services()
-
-
-# --- Header ---
-st.title("🎓 Study what the exam actually asks.")
-st.markdown("""
-StudyFlow reads your syllabus and previous-year papers, maps every question to its topic, 
-and splits your study hours by real exam weightage — not by guesswork.
-""")
 
 # --- Sidebar Controls ---
 with st.sidebar:
@@ -44,54 +49,35 @@ with st.sidebar:
         st.cache_resource.clear()
         st.rerun()
 
-# --- Main Dashboard Columns ---
-col1, col2 = st.columns(2)
+# --- Fetch Live Data ---
+weightages = pyq_service.get_unit_weightage()
+frequencies = pyq_service.get_topic_frequencies()
+plan = planner_service.generate_study_plan(total_study_hours=hours)
 
-with col1:
-    st.subheader("📊 Unit Weightage Analysis")
-    try:
-        weightages = pyq_service.get_unit_weightage()
-        if weightages:
-            st.bar_chart(weightages, y_label="Question Count")
-        else:
-            st.info("No weightage data available yet.")
-    except Exception as e:
-        st.error(f"Failed to load weightages: {e}")
+# --- Read Original Dashboard HTML ---
+base_dir = Path(__file__).resolve().parent
+html_path = base_dir / "templates" / "dashboard.html"
+if html_path.exists():
+    with open(html_path, "r", encoding="utf-8") as f:
+        dashboard_html = f.read()
+else:
+    dashboard_html = "<h1>Dashboard template not found</h1>"
 
-with col2:
-    st.subheader("🎯 PYQ Topic Frequencies")
-    try:
-        frequencies = pyq_service.get_topic_frequencies()
-        if frequencies:
-            sorted_freq = dict(sorted(frequencies.items(), key=lambda x: x[1], reverse=True)[:10])
-            st.bar_chart(sorted_freq, y_label="Frequency")
-        else:
-            st.info("No frequency data available yet.")
-    except Exception as e:
-        st.error(f"Failed to load frequencies: {e}")
+# --- Inject Live Data into HTML & Render ---
+# We replace placeholder comments in your HTML with actual JSON data
+data_script = f"""
+<script>
+window.STUDYFLOW_DATA = {{
+    weightages: {json.dumps(weightages)},
+    frequencies: {json.dumps(frequencies)},
+    plan: {json.dumps(plan)},
+    hours: {hours}
+}};
+</script>
+"""
 
-# --- Study Plan Section ---
-st.divider()
-st.subheader(f"📅 Recommended Study Plan ({hours} Hours)")
+final_html = dashboard_html.replace("</head>", f"{data_script}</head>")
 
-try:
-    plan = planner_service.generate_study_plan(total_study_hours=hours)
-    if isinstance(plan, dict) and "message" not in plan:
-        st.dataframe(
-            plan, 
-            column_config={
-                "questions_appeared": st.column_config.NumberColumn("PYQs"),
-                "weightage_percentage": st.column_config.NumberColumn("Weightage (%)", format="%.1f%%"),
-                "recommended_hours": st.column_config.NumberColumn("Recommended Hours", format="%.1f h")
-            },
-            hide_index=True,
-            use_container_width=True
-        )
-    else:
-        st.warning(plan.get("message", "Could not generate plan."))
-except Exception as e:
-    st.error(f"Failed to build plan: {e}")
+st.components.v1.html(final_html, height=1200, scrolling=True)
 
-# --- Footer ---
-st.divider()
-st.caption("Built with Streamlit • Gemini AI • pypdf • ReportLab")
+st.caption("Built with Streamlit • Gemini AI • pypdf")

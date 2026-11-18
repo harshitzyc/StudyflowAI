@@ -2,6 +2,24 @@
    Rule: the newest click always wins. A new request aborts the stale one,
    so no button is ever silently ignored. All API text uses textContent. */
 (function () {
+    // Check if data was injected by Streamlit parent
+  if (window.STUDYFLOW_DATA) {
+    const mockFetch = (url) => {
+        if (url.includes('/weightages')) return Promise.resolve({ ok: true, json: () => Promise.resolve(window.STUDYFLOW_DATA.weightages) });
+        if (url.includes('/frequencies')) return Promise.resolve({ ok: true, json: () => Promise.resolve(window.STUDYFLOW_DATA.frequencies) });
+        if (url.includes('/plan')) return Promise.resolve({ ok: true, json: () => Promise.resolve(window.STUDYFLOW_DATA.plan) });
+        return Promise.reject(new Error('Unknown endpoint'));
+    };
+    
+    // Override global fetch for these endpoints only
+    const originalFetch = window.fetch;
+    window.fetch = (url, opts) => {
+        if (typeof url === 'string' && (url.includes('/weightages') || url.includes('/frequencies') || url.includes('/plan'))) {
+            return mockFetch(url);
+        }
+        return originalFetch(url, opts);
+    };
+}
   "use strict";
 
   const $ = (s, r = document) => r.querySelector(s);
