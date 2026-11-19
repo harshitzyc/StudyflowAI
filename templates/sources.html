@@ -1,0 +1,544 @@
+{% extends "base.html" %}
+{% block title %}Document intake{% endblock %}
+{% block content %}
+<style>
+  :root{
+    --ink:#14213D; --ink-2:#1D2D50; --ink-3:#2A3B63;
+    --amber:#FFB703; --amber-2:#FB8500; --amber-soft:#FFF3D6;
+    --blue:#2F6FED; --blue-soft:#E8F0FE;
+    --green:#0E9F6E; --green-soft:#E4F6EF;
+    --magenta:#D6409F; --magenta-soft:#FCE8F4;
+    --red:#E5484D; --red-soft:#FDECEC;
+    --paper:#FAF7F2; --surface:#FFFFFF; --line:#E7E0D4; --muted:#5C6478;
+    --overlay:rgba(20,33,61,.46);
+    --r-lg:18px; --r-md:12px; --r-sm:8px;
+    --sh-1:0 1px 2px rgba(20,33,61,.06),0 8px 24px rgba(20,33,61,.07);
+    --sh-2:0 2px 6px rgba(20,33,61,.10),0 18px 48px rgba(20,33,61,.16);
+  }
+  html{scrollbar-color:var(--amber) var(--paper)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:var(--paper)}
+  ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--amber),var(--amber-2));border-radius:8px;border:2px solid var(--paper)}
+  ::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,var(--amber-2),var(--ink-3))}
+  .ink-scroll{scrollbar-color:var(--ink-3) var(--surface)}
+  .ink-scroll::-webkit-scrollbar-track{background:var(--surface)}
+  .ink-scroll::-webkit-scrollbar-thumb{border-color:var(--surface)}
+
+  .int-wrap{position:relative}
+  .int-wrap::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:radial-gradient(900px 420px at 85% -60px,rgba(255,183,3,.18),transparent 60%),
+      radial-gradient(760px 400px at -60px 34%,rgba(47,111,237,.10),transparent 62%),
+      radial-gradient(600px 320px at 55% 110%,rgba(214,64,159,.07),transparent 60%),
+      linear-gradient(180deg,var(--paper),#F4EFE6 68%,var(--paper))}
+  .int-wrap::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:44px 44px;mask-image:radial-gradient(760px 500px at 58% 0%,#000,transparent 76%)}
+
+  .int-head{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;justify-content:space-between;margin-bottom:20px}
+  .int-title{font-family:"Fraunces",serif;font-weight:900;color:var(--ink);letter-spacing:-.01em;margin:0 0 6px}
+  .int-sub{color:var(--muted);margin:0;max-width:62ch}
+  .int-pill{display:inline-flex;align-items:center;gap:8px;font-size:.78rem;font-weight:700;padding:7px 14px;
+    border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2)}
+  .int-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(14,159,110,.16)}
+  .int-pill.busy .dot{background:var(--blue);box-shadow:0 0 0 3px rgba(47,111,237,.16);animation:int-pulse 1.1s infinite}
+  .int-pill.sample .dot{background:var(--amber-2);box-shadow:0 0 0 3px rgba(251,133,0,.16)}
+  @keyframes int-pulse{50%{transform:scale(1.35);opacity:.6}}
+
+  .int-rail{display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--r-lg);box-shadow:var(--sh-1);overflow:hidden;margin-bottom:18px}
+  .int-stage{position:relative;padding:18px 20px;display:flex;gap:14px;align-items:flex-start}
+  .int-stage + .int-stage{border-left:1px dashed var(--line)}
+  .int-stage .num{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-weight:900;
+    font-family:"Fraunces",serif;background:var(--paper);border:1.5px solid var(--line);color:var(--muted);transition:all .3s}
+  .int-stage h3{font-size:.92rem;font-weight:800;color:var(--ink);margin:0 0 3px}
+  .int-stage p{font-size:.78rem;color:var(--muted);margin:0}
+  .int-stage .state{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:.7rem;font-weight:800;
+    letter-spacing:.06em;text-transform:uppercase;padding:3px 10px;border-radius:999px;background:var(--paper);
+    border:1px solid var(--line);color:var(--muted)}
+  .int-stage.done .num{background:var(--green);border-color:var(--green);color:#fff}
+  .int-stage.done .state{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+  .int-stage.active .num{background:var(--blue);border-color:var(--blue);color:#fff;animation:int-pulse 1.2s infinite}
+  .int-stage.active .state{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+  .int-stage.ai .num{background:var(--magenta-soft);border-color:var(--magenta);color:var(--magenta)}
+  .int-stage.ai.active .num{background:var(--magenta);color:#fff}
+  .int-stage.ai.active .state{background:var(--magenta-soft);border-color:var(--magenta);color:var(--magenta)}
+  .int-stage .beam{position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,var(--amber),var(--magenta),var(--blue));
+    transform:scaleX(0);transform-origin:left;transition:transform .6s cubic-bezier(.22,1,.36,1)}
+  .int-stage.done .beam,.int-stage.active .beam{transform:scaleX(1)}
+
+  .int-controls{position:sticky;top:70px;z-index:40;background:rgba(255,255,255,.93);backdrop-filter:blur(10px);
+    border:1px solid var(--line);border-left:5px solid var(--amber);border-radius:var(--r-lg);box-shadow:var(--sh-1);
+    padding:16px 18px;margin-bottom:18px;display:flex;flex-wrap:wrap;gap:14px 18px;align-items:flex-end}
+  .int-group{display:flex;flex-direction:column;gap:6px}
+  .int-label{font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .int-btn{display:inline-flex;align-items:center;gap:8px;border-radius:var(--r-sm);font-weight:700;font-size:.86rem;
+    padding:9px 15px;border:1.5px solid transparent;cursor:pointer;transition:all .15s}
+  .int-btn:disabled{opacity:.5;cursor:not-allowed}
+  .int-btn-ink{background:var(--ink);color:#fff}
+  .int-btn-ink:hover:not(:disabled){background:var(--ink-3);transform:translateY(-1px);box-shadow:var(--sh-1)}
+  .int-btn-amber{background:linear-gradient(120deg,var(--amber),var(--amber-2));color:var(--ink)}
+  .int-btn-amber:hover:not(:disabled){filter:brightness(1.05);transform:translateY(-1px);box-shadow:var(--sh-1)}
+  .int-btn-ghost{background:var(--surface);border-color:var(--line);color:var(--ink-2)}
+  .int-btn-ghost:hover:not(:disabled){border-color:var(--ink-3)}
+  .int-input,.int-select{border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--surface);
+    padding:8px 10px;font-size:.85rem;color:var(--ink)}
+  .int-input:focus,.int-select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(47,111,237,.18)}
+  .int-input{width:180px}
+  .int-sep{width:1px;align-self:stretch;background:var(--line)}
+  .int-spin{width:15px;height:15px;border-radius:50%;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;animation:int-rot .8s linear infinite}
+  .int-spin.dark{border-color:var(--line);border-top-color:var(--amber-2)}
+  @keyframes int-rot{to{transform:rotate(360deg)}}
+
+  .int-drops{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+  .int-drop{position:relative;background:var(--surface);border:2px dashed var(--line);border-radius:var(--r-lg);
+    padding:26px 22px;text-align:center;transition:all .2s;cursor:pointer;overflow:hidden}
+  .int-drop::before{content:"";position:absolute;top:0;right:0;width:0;height:0;border-style:solid;
+    border-width:0 34px 34px 0;border-color:transparent var(--paper) transparent transparent;transition:all .2s}
+  .int-drop:hover,.int-drop.over{border-color:var(--amber-2);background:var(--amber-soft);transform:translateY(-2px);box-shadow:var(--sh-1)}
+  .int-drop.over::before{border-color:transparent var(--amber) transparent transparent}
+  .int-drop.err{border-color:var(--red);background:var(--red-soft)}
+  .int-drop .ic{width:52px;height:52px;margin:0 auto 12px;border-radius:14px;display:grid;place-items:center;font-size:1.4rem}
+  .int-drop.syl .ic{background:var(--blue-soft);color:var(--blue)}
+  .int-drop.pyq .ic{background:var(--magenta-soft);color:var(--magenta)}
+  .int-drop h3{font-size:1rem;font-weight:800;color:var(--ink);margin:0 0 4px}
+  .int-drop p{font-size:.8rem;color:var(--muted);margin:0 0 12px}
+  .int-drop .hint{font-size:.72rem;color:var(--muted)}
+  .int-drop input[type=file]{display:none}
+  .int-progress{height:6px;border-radius:4px;background:var(--paper);overflow:hidden;margin-top:14px}
+  .int-progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--magenta));transition:width .25s}
+  .int-dropmsg{margin-top:10px;font-size:.78rem;font-weight:700}
+  .int-dropmsg.ok{color:var(--green)} .int-dropmsg.bad{color:var(--red)}
+
+  .int-sheets{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+  .int-sheet{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-1);overflow:hidden}
+  .int-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;
+    border-bottom:1px solid var(--line);background:linear-gradient(180deg,#FFFDF8,var(--surface))}
+  .int-sheet-head .t{display:flex;align-items:center;gap:10px;font-weight:800;color:var(--ink);font-size:.92rem}
+  .int-stamp{font-size:.66rem;font-weight:900;letter-spacing:.1em;padding:4px 10px;border-radius:6px;border:1.5px solid;transform:rotate(-2deg)}
+  .int-stamp.ok{color:var(--green);border-color:var(--green);background:var(--green-soft)}
+  .int-stamp.warn{color:var(--amber-2);border-color:var(--amber-2);background:var(--amber-soft)}
+  .int-stamp.bad{color:var(--red);border-color:var(--red);background:var(--red-soft)}
+  .int-sheet-body{padding:16px 18px}
+  .int-fname{font-weight:800;color:var(--ink);font-size:.95rem;word-break:break-all;margin-bottom:8px}
+  .int-kv{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .int-kv span{font-size:.72rem;font-weight:700;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--muted)}
+  .int-excerpt{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.74rem;line-height:1.6;color:var(--ink-2);
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px;max-height:132px;overflow:auto;white-space:pre-wrap}
+  .int-sheet-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+  .int-hist{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-1);overflow:hidden}
+  .int-hist-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+  .int-hist-head .t{font-weight:800;color:var(--ink);display:flex;gap:10px;align-items:center}
+  .int-hist-body{padding:8px}
+  .int-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:12px;align-items:center;padding:12px;border-radius:var(--r-md);transition:background .12s}
+  .int-row:hover{background:var(--amber-soft)}
+  .int-row .kind{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:.95rem}
+  .int-row .kind.syllabus{background:var(--blue-soft);color:var(--blue)}
+  .int-row .kind.pyq{background:var(--magenta-soft);color:var(--magenta)}
+  .int-row .nm{font-weight:700;color:var(--ink);font-size:.88rem;word-break:break-all}
+  .int-row .mt{font-size:.72rem;color:var(--muted)}
+  .int-row .sz{font-size:.76rem;font-weight:700;color:var(--muted);white-space:nowrap}
+  .int-row .ops{display:flex;gap:6px}
+  .int-iconbtn{border:1.5px solid var(--line);background:var(--surface);border-radius:8px;width:32px;height:32px;cursor:pointer;color:var(--ink-2);transition:all .15s}
+  .int-iconbtn:hover{border-color:var(--ink-3);transform:translateY(-1px)}
+  .int-iconbtn.danger:hover{background:var(--red);border-color:var(--red);color:#fff}
+  .int-empty{text-align:center;padding:30px 14px;color:var(--muted)}
+  .int-empty i{font-size:1.8rem;color:var(--amber-2);display:block;margin-bottom:8px}
+
+  .int-cta{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;
+    background:linear-gradient(120deg,var(--ink),var(--ink-3));border-radius:var(--r-lg);padding:22px 26px;margin:20px 0 8px;box-shadow:var(--sh-2)}
+  .int-cta h2{font-family:"Fraunces",serif;font-weight:900;color:#fff;margin:0 0 4px;font-size:1.3rem}
+  .int-cta p{color:#C9D2E8;margin:0;font-size:.86rem}
+
+  .int-scrim{position:fixed;inset:0;background:var(--overlay);z-index:80;opacity:0;transition:opacity .2s}
+  .int-scrim.show{opacity:1}
+  .int-drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:var(--surface);z-index:90;box-shadow:var(--sh-2);
+    transform:translateX(102%);transition:transform .28s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column}
+  .int-drawer.show{transform:translateX(0)}
+  .int-drawer-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 20px;border-bottom:1px solid var(--line);
+    background:linear-gradient(120deg,var(--amber-soft),var(--surface))}
+  .int-drawer-head h2{font-family:"Fraunces",serif;font-size:1.1rem;font-weight:900;color:var(--ink);margin:0;word-break:break-all}
+  .int-drawer-close{border:1.5px solid var(--line);background:var(--surface);border-radius:50%;width:34px;height:34px;cursor:pointer;color:var(--ink-2)}
+  .int-drawer-close:hover{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .int-drawer-tools{display:flex;gap:8px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--line);align-items:center}
+  .int-drawer-body{padding:20px;overflow-y:auto;flex:1}
+  .int-text{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.7;color:var(--ink-2);white-space:pre-wrap;word-break:break-word}
+  .int-text mark{background:var(--amber);color:var(--ink);border-radius:3px;padding:0 2px}
+  .int-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);z-index:100;background:var(--ink);color:#fff;
+    border-radius:999px;padding:11px 20px;display:flex;align-items:center;gap:14px;box-shadow:var(--sh-2);opacity:0;transition:all .25s;font-size:.88rem;font-weight:600}
+  .int-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .int-toast button{border:0;background:var(--amber);color:var(--ink);font-weight:800;border-radius:999px;padding:5px 14px;cursor:pointer}
+
+  @media (max-width:991px){
+    .int-rail{grid-template-columns:1fr 1fr}
+    .int-stage + .int-stage{border-left:0;border-top:1px dashed var(--line)}
+    .int-drops,.int-sheets{grid-template-columns:1fr}
+    .int-controls{top:62px}
+  }
+  @media (max-width:575px){
+    .int-rail{grid-template-columns:1fr}
+    .int-input{width:100%}
+    .int-row{grid-template-columns:auto 1fr auto}
+    .int-row .sz{display:none}
+    .int-drawer{width:100%}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+</style>
+
+<div class="int-wrap">
+  <div class="container py-4 py-lg-5">
+
+    <header class="int-head" data-reveal>
+      <div>
+        <h1 class="int-title h2">How the AI gets your syllabus</h1>
+        <p class="int-sub">Drop your two PDFs below. StudyFlow extracts their text on the server, hands that exact text to the analysis engine, and turns it into weightage and a study plan. Nothing is guessed — preview precisely what the AI reads.</p>
+      </div>
+      <span class="int-pill" id="status-pill"><span class="dot"></span><span id="status-text">Loading…</span></span>
+    </header>
+
+    <section class="int-rail" aria-label="Ingestion pipeline" aria-live="polite" data-reveal>
+      <div class="int-stage" id="st-ingest"><span class="num">1</span>
+        <div><h3>Ingest</h3><p>PDFs received &amp; validated (%PDF header, ≤15 MB).</p><span class="state" id="st-ingest-s">waiting</span></div><span class="beam"></span></div>
+      <div class="int-stage" id="st-extract"><span class="num">2</span>
+        <div><h3>Extract text</h3><p>pypdf pulls selectable text page by page.</p><span class="state" id="st-extract-s">waiting</span></div><span class="beam"></span></div>
+      <div class="int-stage ai" id="st-ai"><span class="num">3</span>
+        <div><h3>AI analysis</h3><p>Topics, questions and mapping from the extracted text.</p><span class="state" id="st-ai-s">waiting</span></div><span class="beam"></span></div>
+      <div class="int-stage" id="st-plan"><span class="num">4</span>
+        <div><h3>Weighted plan</h3><p>Hours split by real exam weightage.</p><span class="state" id="st-plan-s">waiting</span></div><span class="beam"></span></div>
+    </section>
+
+    <section class="int-controls" aria-label="Intake controls" data-reveal>
+      <div class="int-group"><span class="int-label">Syllabus</span>
+        <button class="int-btn int-btn-ink" id="pick-syl" type="button"><i class="bi bi-file-earmark-arrow-up"></i>Choose syllabus.pdf</button></div>
+      <div class="int-group"><span class="int-label">Previous years</span>
+        <button class="int-btn int-btn-ink" id="pick-pyq" type="button"><i class="bi bi-file-earmark-arrow-up"></i>Choose pyq.pdf</button></div>
+      <div class="int-group"><span class="int-label">Analysis</span>
+        <button class="int-btn int-btn-amber" id="run-btn" type="button"><span class="int-spin" id="run-spin" hidden></span><i class="bi bi-stars" id="run-icon"></i><span id="run-label">Run analysis</span></button></div>
+      <div class="int-group"><span class="int-label">Sources</span>
+        <button class="int-btn int-btn-ghost" id="reset-btn" type="button"><i class="bi bi-arrow-counterclockwise"></i>Use bundled samples</button></div>
+      <div class="int-sep" aria-hidden="true"></div>
+      <div class="int-group"><span class="int-label" id="hsearch-l">Search uploads</span>
+        <input class="int-input" id="hist-search" type="search" placeholder="filename…" aria-labelledby="hsearch-l"></div>
+      <div class="int-group"><span class="int-label" id="hsort-l">Sort</span>
+        <select class="int-select" id="hist-sort" aria-labelledby="hsort-l">
+          <option value="new">Newest first</option><option value="old">Oldest first</option>
+          <option value="big">Largest first</option><option value="name">Name A–Z</option></select></div>
+      <div class="int-group"><span class="int-label" id="hfilter-l">Kind</span>
+        <select class="int-select" id="hist-filter" aria-labelledby="hfilter-l">
+          <option value="all">All documents</option><option value="syllabus">Syllabus only</option><option value="pyq">PYQ only</option></select></div>
+      <div class="int-group"><span class="int-label" id="excerpt-l">Preview length</span>
+        <select class="int-select" id="excerpt-len" aria-labelledby="excerpt-l">
+          <option value="240">Short</option><option value="420" selected>Medium</option><option value="900">Long</option></select></div>
+    </section>
+
+    <section class="int-drops" data-reveal>
+      <div class="int-drop syl" id="drop-syl" tabindex="0" role="button" aria-label="Upload syllabus PDF">
+        <span class="ic"><i class="bi bi-journal-bookmark"></i></span>
+        <h3>Syllabus PDF</h3><p>Drag &amp; drop, or click to browse. Units &amp; topics are read from here.</p>
+        <span class="hint">PDF only · up to 15 MB · selectable text (not scanned images)</span>
+        <div class="int-progress"><i id="prog-syl"></i></div>
+        <div class="int-dropmsg" id="msg-syl"></div>
+        <input type="file" id="file-syl" accept="application/pdf,.pdf">
+      </div>
+      <div class="int-drop pyq" id="drop-pyq" tabindex="0" role="button" aria-label="Upload previous-year question PDF">
+        <span class="ic"><i class="bi bi-patch-question"></i></span>
+        <h3>Previous-year paper PDF</h3><p>Drag &amp; drop, or click to browse. Every question is counted from here.</p>
+        <span class="hint">PDF only · up to 15 MB · one or many years combined</span>
+        <div class="int-progress"><i id="prog-pyq"></i></div>
+        <div class="int-dropmsg" id="msg-pyq"></div>
+        <input type="file" id="file-pyq" accept="application/pdf,.pdf">
+      </div>
+    </section>
+
+    <section class="int-sheets" aria-label="Documents the AI currently reads" data-reveal>
+      <article class="int-sheet" id="sheet-syllabus"></article>
+      <article class="int-sheet" id="sheet-pyq"></article>
+    </section>
+
+    <section class="int-hist" data-reveal>
+      <div class="int-hist-head">
+        <span class="t"><i class="bi bi-archive"></i>Upload history</span>
+        <span class="int-pill" id="hist-count">0 documents</span>
+      </div>
+      <div class="int-hist-body" id="hist-body"></div>
+    </section>
+
+    <section class="int-cta" data-reveal>
+      <div><h2>Text in, weightage out.</h2><p id="cta-sub">Once both documents are ingested and analysed, open the dashboard to see your weighted plan.</p></div>
+      <a class="int-btn int-btn-amber" id="cta-link" href="/dashboard"><i class="bi bi-bar-chart-steps"></i>Open the dashboard</a>
+    </section>
+  </div>
+</div>
+
+<div class="int-scrim" id="scrim" hidden></div>
+<aside class="int-drawer ink-scroll" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden>
+  <div class="int-drawer-head"><h2 id="drawer-title">Extracted text</h2>
+    <button class="int-drawer-close" id="drawer-close" type="button" aria-label="Close preview"><i class="bi bi-x-lg"></i></button></div>
+  <div class="int-drawer-tools">
+    <input class="int-input" id="text-search" type="search" placeholder="Highlight in text…" style="width:190px">
+    <span class="int-pill" id="text-stats">—</span>
+    <button class="int-btn int-btn-ghost" id="copy-text" type="button"><i class="bi bi-clipboard"></i>Copy</button>
+    <a class="int-btn int-btn-ghost" id="dl-text" href="#"><i class="bi bi-download"></i>Download .txt</a>
+  </div>
+  <div class="int-drawer-body"><div class="int-text" id="text-body"></div></div>
+</aside>
+
+<div class="int-toast" id="toast" role="status" hidden><span id="toast-msg"></span><button id="toast-undo" type="button" hidden>Undo</button></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  "use strict";
+  var $ = function (s) { return document.querySelector(s); };
+  var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
+  var state = { meta: null, query: "", sort: "new", filter: "all", excerpt: 420, preview: null, polling: null };
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function fmtSize(b) { if (b > 1048576) return (b / 1048576).toFixed(1) + " MB"; if (b > 1024) return (b / 1024).toFixed(0) + " KB"; return b + " B"; }
+  function fmtDate(ts) { return new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); }
+  function debounce(fn, ms) { var t; return function () { var a = arguments, c = this; clearTimeout(t); t = setTimeout(function () { fn.apply(c, a); }, ms); }; }
+  function api(url, opts) {
+    return fetch(url, opts).then(function (r) {
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (j) { throw new Error(j.detail || ("HTTP " + r.status)); });
+      return r.json();
+    });
+  }
+  function toast(msg, undo) {
+    var t = $("#toast"), u = $("#toast-undo");
+    $("#toast-msg").textContent = msg; u.hidden = !undo;
+    u.onclick = undo ? function () { undo(); hideToast(); } : null;
+    t.hidden = false; requestAnimationFrame(function () { t.classList.add("show"); });
+    clearTimeout(toast._t); toast._t = setTimeout(hideToast, 6000);
+  }
+  function hideToast() { var t = $("#toast"); t.classList.remove("show"); setTimeout(function () { t.hidden = true; }, 250); }
+
+  function setStage(id, mode, label) {
+    var el = $("#" + id);
+    el.classList.remove("done", "active");
+    if (mode) el.classList.add(mode);
+    $("#" + id + "-s").textContent = label;
+  }
+  function renderStatus() {
+    var m = state.meta; if (!m) return;
+    var pill = $("#status-pill");
+    pill.classList.remove("busy", "sample");
+    if (m.busy) { pill.classList.add("busy"); $("#status-text").textContent = "Analysing…"; }
+    else if (m.source === "sample") { pill.classList.add("sample"); $("#status-text").textContent = "Sample data"; }
+    else { $("#status-text").textContent = "Analysed · ready"; }
+
+    var sylOk = m.current.syllabus.readable, pyqOk = m.current.pyq.readable;
+    setStage("st-ingest", "done", "2 PDFs received");
+    setStage("st-extract", (sylOk && pyqOk) ? "done" : "active", (sylOk && pyqOk) ? (m.current.syllabus.words + m.current.pyq.words) + " words" : "extracting");
+    setStage("st-ai", m.busy ? "active" : (m.ready ? "done" : ""), m.busy ? "running" : (m.ready ? "complete" : "idle"));
+    setStage("st-plan", m.ready ? "done" : "", m.ready ? "ready" : "waiting");
+    $("#run-spin").hidden = !m.busy; $("#run-icon").hidden = m.busy;
+    $("#run-label").textContent = m.busy ? "Analysing…" : "Run analysis";
+    $("#run-btn").disabled = m.busy;
+    $("#cta-sub").textContent = m.ready
+      ? "Analysis complete — " + m.current.syllabus.words + " syllabus words and " + m.current.pyq.words + " question words ingested. Your weighted plan is live."
+      : "Once both documents are ingested and analysed, open the dashboard to see your weighted plan.";
+  }
+  function pollWhileBusy() {
+    clearInterval(state.polling);
+    state.polling = setInterval(function () {
+      api("/sources/meta").then(function (m) {
+        state.meta = m; renderStatus(); renderSheets();
+        if (!m.busy) { clearInterval(state.polling); toast("Analysis complete"); }
+      }).catch(function () {});
+    }, 2500);
+  }
+
+  function sheetHTML(kind, d) {
+    var stamp = d.readable ? '<span class="int-stamp ok">INGESTED</span>' : '<span class="int-stamp bad">NO TEXT</span>';
+    var label = kind === "syllabus" ? "Syllabus · units & topics" : "Previous years · questions";
+    var icon = kind === "syllabus" ? "bi-journal-bookmark" : "bi-patch-question";
+    return '<div class="int-sheet-head"><span class="t"><i class="bi ' + icon + '"></i>' + label + '</span>' + stamp + '</div>' +
+      '<div class="int-sheet-body"><div class="int-fname">' + esc(d.name) + '</div>' +
+      '<div class="int-kv"><span>' + d.pages + ' pages</span><span>' + d.words + ' words</span><span>' + fmtSize(d.size) + '</span></div>' +
+      '<div class="int-excerpt ink-scroll">' + (d.readable ? esc(d.excerpt.slice(0, state.excerpt)) : "No selectable text found. This PDF is likely a scanned image — replace it with a text-based PDF so the AI can read it.") + '</div>' +
+      '<div class="int-sheet-actions">' +
+      '<button class="int-btn int-btn-ghost" type="button" data-preview="' + esc(d.path) + '"><i class="bi bi-eye"></i>Preview full text</button>' +
+      '<button class="int-btn int-btn-ghost" type="button" data-replace="' + kind + '"><i class="bi bi-arrow-repeat"></i>Replace</button>' +
+      '</div></div>';
+  }
+  function renderSheets() {
+    var m = state.meta; if (!m) return;
+    $("#sheet-syllabus").innerHTML = sheetHTML("syllabus", m.current.syllabus);
+    $("#sheet-pyq").innerHTML = sheetHTML("pyq", m.current.pyq);
+    $$("[data-preview]").forEach(function (b) { b.addEventListener("click", function () { openPreview(b.getAttribute("data-preview")); }); });
+    $$("[data-replace]").forEach(function (b) { b.addEventListener("click", function () { $("#file-" + (b.getAttribute("data-replace") === "syllabus" ? "syl" : "pyq")).click(); }); });
+  }
+
+  function histList() {
+    var m = state.meta; if (!m) return [];
+    var list = m.history.slice();
+    if (state.filter !== "all") list = list.filter(function (h) { return h.kind === state.filter; });
+    if (state.query) { var q = state.query.toLowerCase(); list = list.filter(function (h) { return h.name.toLowerCase().indexOf(q) !== -1; }); }
+    if (state.sort === "new") list.sort(function (a, b) { return b.ts - a.ts; });
+    if (state.sort === "old") list.sort(function (a, b) { return a.ts - b.ts; });
+    if (state.sort === "big") list.sort(function (a, b) { return b.size - a.size; });
+    if (state.sort === "name") list.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    return list;
+  }
+  function renderHistory() {
+    var list = histList(), body = $("#hist-body");
+    $("#hist-count").textContent = list.length + " document" + (list.length === 1 ? "" : "s");
+    if (!list.length) {
+      body.innerHTML = '<div class="int-empty"><i class="bi bi-inboxes"></i>' +
+        (state.query || state.filter !== "all" ? "No uploads match your filters." : "No uploads yet — the bundled sample PDFs are in use. Drop your own above to replace them.") + '</div>';
+      return;
+    }
+    body.innerHTML = list.map(function (h) {
+      var inUse = state.meta && (state.meta.current.syllabus.path === h.path || state.meta.current.pyq.path === h.path);
+      return '<div class="int-row"><span class="kind ' + h.kind + '"><i class="bi ' + (h.kind === "syllabus" ? "bi-journal-bookmark" : "bi-patch-question") + '"></i></span>' +
+        '<span><span class="nm">' + esc(h.name) + (inUse ? ' <span class="int-stamp ok" style="transform:none">IN USE</span>' : '') + '</span><br>' +
+        '<span class="mt">' + h.kind + ' · ' + fmtDate(h.ts) + '</span></span>' +
+        '<span class="sz">' + fmtSize(h.size) + '</span>' +
+        '<span class="ops">' +
+        '<button class="int-iconbtn" type="button" data-hpreview="' + esc(h.path) + '" title="Preview text"><i class="bi bi-eye"></i></button>' +
+        '<button class="int-iconbtn" type="button" data-huse=\'' + esc(JSON.stringify({ id: h.id, kind: h.kind, path: h.path })) + '\' title="Use this document"><i class="bi bi-check2"></i></button>' +
+        '<button class="int-iconbtn danger" type="button" data-hdel="' + esc(h.id) + '" title="Delete upload"><i class="bi bi-trash3"></i></button>' +
+        '</span></div>';
+    }).join("");
+    $$("[data-hpreview]").forEach(function (b) { b.addEventListener("click", function () { openPreview(b.getAttribute("data-hpreview")); }); });
+    $$("[data-huse]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var info = JSON.parse(b.getAttribute("data-huse"));
+        var cur = state.meta.current;
+        var body = { syllabus: info.kind === "syllabus" ? info.path : cur.syllabus.path, pyq: info.kind === "pyq" ? info.path : cur.pyq.path };
+        api("/sources/select", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+          .then(function (m) { state.meta = m; renderAll(); pollWhileBusy(); toast("Now reading " + info.kind + " from " + info.path.split("/").pop()); })
+          .catch(function (e) { toast(e.message); });
+      });
+    });
+    $$("[data-hdel]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var id = b.getAttribute("data-hdel");
+        api("/sources/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: id }) })
+          .then(function (m) {
+            state.meta = m; renderAll();
+            toast("Upload deleted", function () {
+              api("/sources/restore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: id }) })
+                .then(function (m2) { state.meta = m2; renderAll(); toast("Upload restored"); })
+                .catch(function (e) { toast(e.message); });
+            });
+          }).catch(function (e) { toast(e.message); });
+      });
+    });
+  }
+  function renderAll() { renderStatus(); renderSheets(); renderHistory(); }
+
+  function validate(file) {
+    if (!file) return "No file selected.";
+    if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") return "Only PDF files are accepted.";
+    if (file.size > 15 * 1024 * 1024) return "File exceeds the 15 MB limit.";
+    if (file.size === 0) return "File is empty.";
+    return null;
+  }
+  function upload(kind, file) {
+    var slot = kind === "syllabus" ? "syl" : "pyq";
+    var msg = $("#msg-" + slot), prog = $("#prog-" + slot), zone = $("#drop-" + slot);
+    var err = validate(file);
+    zone.classList.remove("err");
+    if (err) { zone.classList.add("err"); msg.className = "int-dropmsg bad"; msg.textContent = err; return; }
+    msg.className = "int-dropmsg"; msg.textContent = "Uploading " + file.name + "…";
+    var fd = new FormData(); fd.append(kind, file);
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "/sources/upload");
+    xhr.upload.onprogress = function (e) { if (e.lengthComputable) prog.style.width = (e.loaded / e.total * 100).toFixed(0) + "%"; };
+    xhr.onload = function () {
+      prog.style.width = "100%";
+      if (xhr.status >= 200 && xhr.status < 300) {
+        state.meta = JSON.parse(xhr.responseText);
+        msg.className = "int-dropmsg ok"; msg.textContent = "Ingested — AI is re-reading this document.";
+        renderAll(); pollWhileBusy();
+        setTimeout(function () { prog.style.width = "0"; }, 1200);
+      } else {
+        var d = {}; try { d = JSON.parse(xhr.responseText); } catch (e) {}
+        zone.classList.add("err"); msg.className = "int-dropmsg bad"; msg.textContent = d.detail || ("Upload failed (HTTP " + xhr.status + ").");
+        prog.style.width = "0";
+      }
+    };
+    xhr.onerror = function () { zone.classList.add("err"); msg.className = "int-dropmsg bad"; msg.textContent = "Network error during upload."; prog.style.width = "0"; };
+    xhr.send(fd);
+  }
+  function wireDrop(slot, kind) {
+    var zone = $("#drop-" + slot), input = $("#file-" + slot);
+    zone.addEventListener("click", function () { input.click(); });
+    zone.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } });
+    input.addEventListener("change", function () { if (input.files[0]) upload(kind, input.files[0]); input.value = ""; });
+    ["dragenter", "dragover"].forEach(function (ev) { zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.add("over"); }); });
+    ["dragleave", "drop"].forEach(function (ev) { zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.remove("over"); }); });
+    zone.addEventListener("drop", function (e) { var f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) upload(kind, f); });
+  }
+
+  var lastFocus = null;
+  function openPreview(path) {
+    lastFocus = document.activeElement;
+    $("#drawer-title").textContent = "Loading…";
+    $("#text-body").textContent = "";
+    var d = $("#drawer"), s = $("#scrim");
+    d.hidden = false; s.hidden = false;
+    requestAnimationFrame(function () { d.classList.add("show"); s.classList.add("show"); });
+    $("#drawer-close").focus();
+    $("#dl-text").href = "/sources/download-text?path=" + encodeURIComponent(path);
+    api("/sources/preview?path=" + encodeURIComponent(path)).then(function (p) {
+      state.preview = p;
+      $("#drawer-title").textContent = p.name;
+      $("#text-stats").textContent = p.pages + " pages · " + p.words + " words · " + p.chars + " chars";
+      paintText("");
+    }).catch(function (e) { $("#text-body").textContent = "Could not read this document: " + e.message; });
+  }
+  function paintText(q) {
+    var p = state.preview; if (!p) return;
+    var text = p.text;
+    if (!q) { $("#text-body").textContent = text; return; }
+    var lower = text.toLowerCase(), ql = q.toLowerCase(), out = "", i = 0;
+    while (true) {
+      var idx = lower.indexOf(ql, i);
+      if (idx === -1) { out += esc(text.slice(i)); break; }
+      out += esc(text.slice(i, idx)) + "<mark>" + esc(text.slice(idx, idx + q.length)) + "</mark>";
+      i = idx + q.length;
+    }
+    $("#text-body").innerHTML = out;
+  }
+  function closeDrawer() {
+    var d = $("#drawer"), s = $("#scrim");
+    d.classList.remove("show"); s.classList.remove("show");
+    setTimeout(function () { d.hidden = true; s.hidden = true; }, 280);
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+
+  wireDrop("syl", "syllabus"); wireDrop("pyq", "pyq");
+  $("#pick-syl").addEventListener("click", function () { $("#file-syl").click(); });
+  $("#pick-pyq").addEventListener("click", function () { $("#file-pyq").click(); });
+  $("#run-btn").addEventListener("click", function () {
+    api("/sources/analyse", { method: "POST" }).then(function () {
+      state.meta.busy = true; renderStatus(); pollWhileBusy(); toast("Analysis started");
+    }).catch(function (e) { toast(e.message); });
+  });
+  $("#reset-btn").addEventListener("click", function () {
+    api("/sources/reset", { method: "POST" }).then(function (m) { state.meta = m; renderAll(); pollWhileBusy(); toast("Bundled samples restored"); })
+      .catch(function (e) { toast(e.message); });
+  });
+  $("#hist-search").addEventListener("input", debounce(function () { state.query = this.value.trim(); renderHistory(); }, 180));
+  $("#hist-sort").addEventListener("change", function () { state.sort = this.value; renderHistory(); });
+  $("#hist-filter").addEventListener("change", function () { state.filter = this.value; renderHistory(); });
+  $("#excerpt-len").addEventListener("change", function () { state.excerpt = parseInt(this.value, 10); renderSheets(); });
+  $("#drawer-close").addEventListener("click", closeDrawer);
+  $("#scrim").addEventListener("click", closeDrawer);
+  $("#text-search").addEventListener("input", debounce(function () { paintText(this.value.trim()); }, 150));
+  $("#copy-text").addEventListener("click", function () {
+    if (!state.preview) return;
+    var done = function () { toast("Extracted text copied"); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(state.preview.text).then(done, function () { toast("Copy blocked by browser"); });
+    else toast("Copy unsupported in this browser");
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDrawer(); });
+
+  api("/sources/meta").then(function (m) { state.meta = m; renderAll(); if (m.busy) pollWhileBusy(); })
+    .catch(function (e) { $("#status-text").textContent = "Intake offline"; toast(e.message); });
+})();
+</script>
+{% endblock %}

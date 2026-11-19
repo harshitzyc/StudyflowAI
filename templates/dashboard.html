@@ -1,159 +1,885 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
-<div class="container py-4 py-lg-5">
+<!-- templates/dashboard.html — THE analysis dashboard (route /dashboard).
+     The separate ~600-line file is templates/sources.html (route /sources, document intake).
+     They are different pages; keep both. This file is self-contained apart from base.html. -->
+<style>
+  :root{
+    --ink:#14213D; --ink-2:#1D2D50; --ink-3:#2A3B63;
+    --amber:#FFB703; --amber-2:#FB8500; --amber-soft:#FFF3D6;
+    --paper:#FAF7F2; --surface:#FFFFFF; --overlay:rgba(20,33,61,.46);
+    --green:#0E9F6E; --red:#E5484D; --blue:#2F6FED; --violet:#7C5CFF;
+    --teal:#0EA5A5; --magenta:#D6409F; --line:#E7E0D4; --muted:#5C6478;
+    --chart-1:#2F6FED; --chart-2:#FFB703; --chart-3:#0E9F6E; --chart-4:#7C5CFF;
+    --chart-5:#0EA5A5; --chart-6:#D6409F; --chart-7:#E5484D; --chart-8:#14213D;
+    --r-lg:18px; --r-md:12px; --r-sm:8px;
+    --shadow-1:0 1px 2px rgba(20,33,61,.06),0 8px 24px rgba(20,33,61,.07);
+    --shadow-2:0 2px 6px rgba(20,33,61,.10),0 18px 48px rgba(20,33,61,.16);
+  }
+  html{scrollbar-color:var(--amber) var(--paper);}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:var(--paper)}
+  ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--amber),var(--amber-2));border-radius:8px;border:2px solid var(--paper)}
+  ::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,var(--amber-2),var(--ink-3))}
+  .dsh-scroll{scrollbar-color:var(--ink-3) var(--surface);}
+  .dsh-scroll::-webkit-scrollbar-track{background:var(--surface)}
+  .dsh-scroll::-webkit-scrollbar-thumb{border-color:var(--surface)}
 
-  <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
-    <div>
-      <h1 class="font-display h2 mb-1">Study dashboard</h1>
-      <p class="text-secondary mb-0">Live analysis of <code>syllabus.pdf</code> + <code>pyq.pdf</code> — no sample numbers.</p>
-    </div>
-    <span class="badge sf-badge-live"><i class="bi bi-broadcast me-1"></i>Live API data</span>
-  </div>
+  .dsh-wrap{position:relative;}
+  .dsh-wrap::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(900px 420px at 88% -60px, rgba(255,183,3,.16), transparent 60%),
+      radial-gradient(700px 380px at -80px 30%, rgba(47,111,237,.08), transparent 60%),
+      linear-gradient(180deg,var(--paper),#F4EFE6 70%,var(--paper));}
+  .dsh-wrap::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:44px 44px;mask-image:radial-gradient(720px 480px at 60% 0%,#000,transparent 75%);}
 
-  <!-- Hours control -->
-  <div class="card sf-hours-card mb-4">
-    <div class="card-body p-4">
-      <div class="row g-3 align-items-end">
-        <div class="col-sm-auto">
-          <label for="hours-input" class="form-label fw-semibold mb-1">Total study hours</label>
-          <input type="number" class="form-control sf-hours-input" id="hours-input" min="1" max="500" step="1" value="20" inputmode="numeric">
-          <div class="invalid-feedback">Enter a whole number between 1 and 500.</div>
-        </div>
-        <div class="col-sm-auto">
-          <div class="d-flex gap-2 flex-wrap" role="group" aria-label="Hour presets">
-            <button type="button" class="btn btn-outline-ink btn-sm" data-hours="10">10</button>
-            <button type="button" class="btn btn-outline-ink btn-sm" data-hours="20">20</button>
-            <button type="button" class="btn btn-outline-ink btn-sm" data-hours="40">40</button>
-            <button type="button" class="btn btn-outline-ink btn-sm" data-hours="60">60</button>
+  .dsh-head{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+  .dsh-title{font-family:"Fraunces",serif;font-weight:900;color:var(--ink);letter-spacing:-.01em;margin:0 0 4px}
+  .dsh-sub{color:var(--muted);margin:0}
+  .dsh-badges{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .dsh-pill{display:inline-flex;align-items:center;gap:7px;font-size:.78rem;font-weight:600;
+    padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2)}
+  .dsh-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(14,159,110,.16)}
+  .dsh-pill.is-sample .dot{background:var(--amber-2);box-shadow:0 0 0 3px rgba(251,133,0,.16)}
+  .dsh-pill.is-busy .dot{background:var(--blue);box-shadow:0 0 0 3px rgba(47,111,237,.16);animation:dsh-pulse 1.1s ease-in-out infinite}
+  @keyframes dsh-pulse{50%{transform:scale(1.35);opacity:.6}}
+
+  .dsh-toolbar{position:sticky;top:70px;z-index:40;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border:1px solid var(--line);border-left:5px solid var(--amber);border-radius:var(--r-lg);
+    box-shadow:var(--shadow-1);padding:16px 18px;margin-bottom:16px}
+  .dsh-toolbar-row{display:flex;flex-wrap:wrap;gap:14px 18px;align-items:flex-end}
+  .dsh-group{display:flex;flex-direction:column;gap:6px}
+  .dsh-label{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .dsh-hours{display:flex;align-items:center;gap:10px}
+  .dsh-num{width:86px;font-weight:700;color:var(--ink);border:1.5px solid var(--line);border-radius:var(--r-sm);
+    padding:8px 10px;background:var(--paper);transition:border-color .15s,box-shadow .15s}
+  .dsh-num:focus{outline:none;border-color:var(--amber-2);box-shadow:0 0 0 3px rgba(255,183,3,.25)}
+  .dsh-range{width:150px;accent-color:var(--amber-2);cursor:pointer}
+  .dsh-presets{display:flex;gap:6px}
+  .dsh-chipbtn{border:1.5px solid var(--line);background:var(--surface);color:var(--ink-2);font-weight:600;
+    border-radius:999px;padding:6px 13px;font-size:.82rem;transition:all .15s}
+  .dsh-chipbtn:hover{border-color:var(--ink-3);transform:translateY(-1px)}
+  .dsh-chipbtn.is-active{background:var(--ink);border-color:var(--ink);color:#fff}
+  .dsh-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .dsh-btn{display:inline-flex;align-items:center;gap:8px;border-radius:var(--r-sm);font-weight:700;font-size:.88rem;
+    padding:9px 16px;border:1.5px solid transparent;transition:all .15s;cursor:pointer}
+  .dsh-btn:disabled{opacity:.5;cursor:not-allowed}
+  .dsh-btn-primary{background:var(--ink);color:#fff}
+  .dsh-btn-primary:hover:not(:disabled){background:var(--ink-3);transform:translateY(-1px);box-shadow:var(--shadow-1)}
+  .dsh-btn-amber{background:linear-gradient(120deg,var(--amber),var(--amber-2));color:var(--ink)}
+  .dsh-btn-amber:hover:not(:disabled){filter:brightness(1.05);transform:translateY(-1px);box-shadow:var(--shadow-1)}
+  .dsh-btn-ghost{background:var(--surface);border-color:var(--line);color:var(--ink-2)}
+  .dsh-btn-ghost:hover:not(:disabled){border-color:var(--ink-3)}
+  .dsh-sep{width:1px;align-self:stretch;background:var(--line)}
+  .dsh-input,.dsh-select{border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--surface);
+    padding:8px 10px;font-size:.86rem;color:var(--ink);transition:border-color .15s,box-shadow .15s}
+  .dsh-input:focus,.dsh-select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(47,111,237,.18)}
+  .dsh-input{width:170px}
+  .dsh-viewtoggle{display:flex;border:1.5px solid var(--line);border-radius:var(--r-sm);overflow:hidden}
+  .dsh-viewtoggle button{border:0;background:var(--surface);padding:8px 12px;color:var(--muted);cursor:pointer;transition:all .15s}
+  .dsh-viewtoggle button.is-active{background:var(--ink);color:#fff}
+  .dsh-savepop{position:relative}
+  .dsh-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:60;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--r-md);box-shadow:var(--shadow-2);padding:12px;display:flex;gap:8px;width:250px}
+  .dsh-pop[hidden]{display:none}
+
+  .dsh-views{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 18px}
+  .dsh-views-label{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+  .dsh-view{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1.5px solid var(--line);
+    border-radius:999px;padding:5px 6px 5px 14px;font-size:.82rem;font-weight:600;color:var(--ink-2);transition:all .15s}
+  .dsh-view:hover{border-color:var(--amber-2);box-shadow:var(--shadow-1)}
+  .dsh-view button{border:0;background:var(--paper);border-radius:50%;width:22px;height:22px;line-height:1;
+    color:var(--muted);cursor:pointer;transition:all .15s}
+  .dsh-view button:hover{background:var(--red);color:#fff}
+  .dsh-view .apply{background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:0}
+
+  .dsh-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+  .dsh-stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:16px 18px;
+    box-shadow:var(--shadow-1);position:relative;overflow:hidden;transition:transform .18s,box-shadow .18s}
+  .dsh-stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-2)}
+  .dsh-stat::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--sc,var(--amber))}
+  .dsh-stat .v{font-family:"Fraunces",serif;font-weight:900;font-size:1.7rem;color:var(--ink);line-height:1.1}
+  .dsh-stat .l{font-size:.78rem;color:var(--muted);font-weight:600}
+
+  .dsh-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;margin-bottom:16px}
+  .dsh-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-1);overflow:hidden}
+  .dsh-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;
+    border-bottom:1px solid var(--line);background:linear-gradient(180deg,#FFFDF8,var(--surface))}
+  .dsh-card-head .t{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--ink)}
+  .dsh-card-head .t i{color:var(--amber-2)}
+  .dsh-card-body{padding:18px}
+  .dev-only{display:none}
+  body.dev-on .dev-only{display:inline-flex}
+  .dsh-endpoint{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.7rem;background:var(--paper);
+    border:1px solid var(--line);border-radius:6px;padding:3px 8px;color:var(--muted)}
+
+  .dsh-tablewrap{overflow-x:auto;border-radius:var(--r-sm)}
+  table.dsh-table{width:100%;border-collapse:collapse;font-size:.9rem}
+  .dsh-table th{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;
+    padding:10px 12px;background:var(--paper);border-bottom:1px solid var(--line)}
+  .dsh-table td{padding:12px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:middle}
+  .dsh-table tbody tr{cursor:pointer;transition:background .12s}
+  .dsh-table tbody tr:hover{background:var(--amber-soft)}
+  .dsh-table tbody tr.is-top{background:linear-gradient(90deg,var(--amber-soft),transparent)}
+  .dsh-table tfoot td{font-weight:800;color:var(--ink);background:var(--paper);border-bottom:0}
+  .dsh-hchip{display:inline-block;background:var(--amber-soft);border:1px solid var(--amber);color:var(--ink);
+    font-weight:700;border-radius:999px;padding:3px 12px;font-size:.82rem}
+  .dsh-minibar{display:block;height:5px;border-radius:4px;background:var(--paper);overflow:hidden;margin-top:6px;min-width:70px}
+  .dsh-minibar i{display:block;height:100%;border-radius:4px;background:var(--bc,var(--amber))}
+
+  .dsh-bars{display:flex;flex-direction:column;gap:14px}
+  .dsh-bar{border:0;background:none;padding:0;text-align:left;cursor:pointer;width:100%}
+  .dsh-bar .row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
+  .dsh-bar .name{font-weight:700;color:var(--ink);font-size:.92rem}
+  .dsh-bar .val{font-size:.8rem;color:var(--muted);font-weight:600;white-space:nowrap}
+  .dsh-bar .track{display:block;height:10px;border-radius:6px;background:var(--paper);border:1px solid var(--line);overflow:hidden}
+  .dsh-bar .fill{display:block;height:100%;border-radius:6px;background:var(--bc,var(--blue));
+    width:0;transition:width .7s cubic-bezier(.22,1,.36,1)}
+  .dsh-bar:hover .name{color:var(--amber-2)}
+  .dsh-bar:focus-visible{outline:2px solid var(--blue);outline-offset:3px;border-radius:6px}
+
+  .dsh-freq{display:flex;flex-direction:column;gap:12px}
+  .dsh-freq-item{display:grid;grid-template-columns:34px 1fr auto;gap:12px;align-items:center;border:0;background:none;
+    padding:6px 4px;text-align:left;cursor:pointer;border-radius:var(--r-sm);transition:background .12s}
+  .dsh-freq-item:hover{background:var(--amber-soft)}
+  .dsh-freq-item:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+  .dsh-rank{font-family:"Fraunces",serif;font-weight:900;color:var(--muted);font-size:1rem;text-align:center}
+  .dsh-freq-item:nth-child(1) .dsh-rank{color:var(--amber-2)}
+  .dsh-freq-item:nth-child(2) .dsh-rank{color:var(--ink-3)}
+  .dsh-freq-item:nth-child(3) .dsh-rank{color:var(--teal)}
+  .dsh-freq .name{display:block;font-weight:700;color:var(--ink);font-size:.92rem;margin-bottom:5px}
+  .dsh-freq .track{display:block;height:8px;border-radius:5px;background:var(--paper);border:1px solid var(--line);overflow:hidden}
+  .dsh-freq .fill{display:block;height:100%;background:linear-gradient(90deg,var(--amber),var(--amber-2));width:0;
+    transition:width .7s cubic-bezier(.22,1,.36,1)}
+  .dsh-count{background:var(--amber-soft);border:1px solid var(--amber);border-radius:8px;font-weight:800;
+    color:var(--ink);font-size:.8rem;padding:3px 9px}
+
+  .dsh-skel{display:flex;flex-direction:column;gap:10px}
+  .dsh-skel span{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--paper),#EFE8DB,var(--paper));
+    background-size:200% 100%;animation:dsh-shimmer 1.3s linear infinite}
+  @keyframes dsh-shimmer{to{background-position:-200% 0}}
+  .dsh-loading-note{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:.84rem;margin-bottom:12px}
+  .dsh-spin{width:15px;height:15px;border-radius:50%;border:2.5px solid var(--line);border-top-color:var(--amber-2);
+    animation:dsh-rot .8s linear infinite;flex:none}
+  @keyframes dsh-rot{to{transform:rotate(360deg)}}
+  .dsh-error{display:flex;gap:12px;background:#FDECEC;border:1px solid #F5C2C4;border-radius:var(--r-md);padding:14px}
+  .dsh-error i{color:var(--red);font-size:1.1rem;margin-top:2px}
+  .dsh-error strong{color:#8C2B2E;display:block;margin-bottom:4px}
+  .dsh-error p{margin:0 0 8px;font-size:.84rem;color:#7A3A3C}
+  .dsh-error details{font-size:.76rem;color:#7A3A3C;margin-bottom:8px}
+  .dsh-error summary{cursor:pointer;font-weight:600}
+  .dsh-error pre{white-space:pre-wrap;word-break:break-word;background:#fff;border-radius:6px;padding:8px;margin:6px 0 0;max-height:140px;overflow:auto}
+  .dsh-empty{text-align:center;padding:26px 12px;color:var(--muted)}
+  .dsh-empty i{font-size:1.8rem;color:var(--amber-2);display:block;margin-bottom:8px}
+
+  .dsh-scrim{position:fixed;inset:0;background:var(--overlay);z-index:80;opacity:0;transition:opacity .2s}
+  .dsh-scrim.show{opacity:1}
+  .dsh-drawer{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--surface);z-index:90;
+    box-shadow:var(--shadow-2);transform:translateX(102%);transition:transform .28s cubic-bezier(.22,1,.36,1);
+    display:flex;flex-direction:column}
+  .dsh-drawer.show{transform:translateX(0)}
+  .dsh-drawer-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 20px;
+    border-bottom:1px solid var(--line);background:linear-gradient(120deg,var(--amber-soft),var(--surface))}
+  .dsh-drawer-head h2{font-family:"Fraunces",serif;font-size:1.15rem;font-weight:900;color:var(--ink);margin:0}
+  .dsh-drawer-close{border:1.5px solid var(--line);background:var(--surface);border-radius:50%;width:34px;height:34px;
+    cursor:pointer;color:var(--ink-2);transition:all .15s}
+  .dsh-drawer-close:hover{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .dsh-drawer-body{padding:20px;overflow-y:auto;flex:1}
+  .dsh-kv{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+  .dsh-kv .cell{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-md);padding:12px}
+  .dsh-kv .v{font-family:"Fraunces",serif;font-weight:900;font-size:1.35rem;color:var(--ink)}
+  .dsh-kv .l{font-size:.74rem;color:var(--muted);font-weight:600}
+  .dsh-tip{background:var(--amber-soft);border:1px solid var(--amber);border-radius:var(--r-md);padding:14px;
+    font-size:.86rem;color:var(--ink-2)}
+  .dsh-tip strong{display:flex;align-items:center;gap:8px;color:var(--ink);margin-bottom:6px}
+
+  .dsh-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);z-index:100;
+    background:var(--ink);color:#fff;border-radius:999px;padding:11px 20px;display:flex;align-items:center;gap:14px;
+    box-shadow:var(--shadow-2);opacity:0;transition:all .25s;font-size:.88rem;font-weight:600}
+  .dsh-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .dsh-toast button{border:0;background:var(--amber);color:var(--ink);font-weight:800;border-radius:999px;
+    padding:5px 14px;cursor:pointer}
+  .dsh-foot{color:var(--muted);font-size:.8rem;margin:18px 0 8px;display:flex;gap:8px;align-items:center}
+
+  @media (max-width:991px){
+    .dsh-grid{grid-template-columns:1fr}
+    .dsh-stats{grid-template-columns:repeat(2,1fr)}
+    .dsh-toolbar{top:62px}
+  }
+  @media (max-width:575px){
+    .dsh-stats{grid-template-columns:1fr 1fr;gap:10px}
+    .dsh-input{width:100%}
+    .dsh-range{width:110px}
+    .dsh-drawer{width:100%}
+    .dsh-toolbar{padding:14px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+  }
+</style>
+
+<div class="dsh-wrap">
+  <div class="container py-4 py-lg-5">
+
+    <header class="dsh-head" data-reveal>
+      <div>
+        <h1 class="dsh-title h2">Study dashboard</h1>
+        <p class="dsh-sub">Weightage-driven planning from your syllabus and previous-year papers.</p>
+      </div>
+      <div class="dsh-badges">
+        <span class="dsh-pill" id="source-pill"><span class="dot"></span><span id="source-text">Loading…</span></span>
+        <span class="dsh-pill" id="fresh-pill"><i class="bi bi-clock-history"></i><span id="fresh-text">—</span></span>
+        <button class="dsh-pill" id="dev-toggle" type="button" aria-pressed="false" title="Show endpoint details">
+          <i class="bi bi-braces"></i>Developer
+        </button>
+      </div>
+    </header>
+
+    <section class="dsh-toolbar" aria-label="Dashboard controls" data-reveal>
+      <div class="dsh-toolbar-row">
+        <div class="dsh-group">
+          <span class="dsh-label" id="hours-label">Total study hours</span>
+          <div class="dsh-hours">
+            <input class="dsh-num" id="hours-input" type="number" min="1" max="500" step="1" value="20"
+                   inputmode="numeric" aria-labelledby="hours-label">
+            <input class="dsh-range" id="hours-range" type="range" min="1" max="120" step="1" value="20"
+                   aria-label="Study hours slider">
+            <div class="dsh-presets" role="group" aria-label="Hour presets">
+              <button class="dsh-chipbtn" type="button" data-hours="10">10</button>
+              <button class="dsh-chipbtn is-active" type="button" data-hours="20">20</button>
+              <button class="dsh-chipbtn" type="button" data-hours="40">40</button>
+              <button class="dsh-chipbtn" type="button" data-hours="60">60</button>
+            </div>
           </div>
         </div>
-        <div class="col-sm-auto">
-          <button type="button" class="btn btn-primary" id="rebuild-btn">
-            <span class="spinner-border spinner-border-sm me-2 d-none" id="plan-spinner" aria-hidden="true"></span>
-            <i class="bi bi-arrow-repeat me-1" id="plan-btn-icon"></i><span id="plan-btn-label">Rebuild plan</span>
-          </button>
+
+        <div class="dsh-group">
+          <span class="dsh-label">Plan</span>
+          <div class="dsh-actions">
+            <button class="dsh-btn dsh-btn-primary" id="rebuild-btn" type="button">
+              <span class="dsh-spin" id="plan-spin" hidden></span>
+              <i class="bi bi-arrow-repeat" id="plan-icon"></i><span id="plan-label">Rebuild plan</span>
+            </button>
+            <a class="dsh-btn dsh-btn-amber" id="export-link" href="/export-pdf?hours=20" target="_blank" rel="noopener" aria-disabled="true">
+              <i class="bi bi-file-earmark-pdf"></i>Export PDF
+            </a>
+            <button class="dsh-btn dsh-btn-ghost" id="refresh-btn" type="button" title="Re-run the AI analysis">
+              <span class="dsh-spin" id="refresh-spin" hidden></span>
+              <i class="bi bi-stars" id="refresh-icon"></i><span id="refresh-label">Re-analyse</span>
+            </button>
+          </div>
         </div>
-        <div class="col-sm-auto ms-sm-auto">
-          <a class="btn btn-highlight" id="export-link" href="/export-pdf?hours=20" target="_blank" rel="noopener">
-            <i class="bi bi-file-earmark-pdf me-1"></i>Export PDF
-          </a>
+
+        <div class="dsh-sep" aria-hidden="true"></div>
+
+        <div class="dsh-group">
+          <span class="dsh-label" id="search-label">Search topics</span>
+          <input class="dsh-input" id="freq-search" type="search" placeholder="e.g. normalization…" aria-labelledby="search-label">
+        </div>
+        <div class="dsh-group">
+          <span class="dsh-label" id="sort-label">Sort</span>
+          <select class="dsh-select" id="freq-sort" aria-labelledby="sort-label">
+            <option value="count-desc">Most asked</option>
+            <option value="count-asc">Least asked</option>
+            <option value="name-asc">Name A–Z</option>
+          </select>
+        </div>
+        <div class="dsh-group">
+          <span class="dsh-label" id="topn-label">Show</span>
+          <select class="dsh-select" id="freq-topn" aria-labelledby="topn-label">
+            <option value="5">Top 5</option>
+            <option value="8" selected>Top 8</option>
+            <option value="10">Top 10</option>
+            <option value="all">All</option>
+          </select>
+        </div>
+        <div class="dsh-group">
+          <span class="dsh-label">View</span>
+          <div class="dsh-viewtoggle" role="group" aria-label="Frequency view">
+            <button type="button" id="view-bars" class="is-active" aria-pressed="true" title="Bars"><i class="bi bi-bar-chart"></i></button>
+            <button type="button" id="view-table" aria-pressed="false" title="Table"><i class="bi bi-table"></i></button>
+          </div>
+        </div>
+        <div class="dsh-group">
+          <span class="dsh-label">Views</span>
+          <div class="dsh-actions">
+            <div class="dsh-savepop">
+              <button class="dsh-btn dsh-btn-ghost" id="save-view-btn" type="button"><i class="bi bi-bookmark-plus"></i>Save view</button>
+              <form class="dsh-pop" id="save-form" hidden>
+                <input class="dsh-input" id="view-name" style="width:100%" placeholder="View name…" maxlength="40" required>
+                <button class="dsh-btn dsh-btn-primary" type="submit">Save</button>
+              </form>
+            </div>
+            <button class="dsh-btn dsh-btn-ghost" id="reset-filters" type="button" title="Reset search, sort and view">
+              <i class="bi bi-eraser"></i>Reset
+            </button>
+          </div>
         </div>
       </div>
-      <p class="small text-secondary mt-3 mb-0"><i class="bi bi-info-circle me-1"></i>The first analysis can take 30–60 seconds while Gemini reads the PDFs. The PDF is generated on demand.</p>
-    </div>
-  </div>
+    </section>
 
-  <!-- Summary strip (filled from real responses) -->
-  <div class="row row-cols-2 row-cols-lg-4 g-3 mb-4">
-    <div class="col"><div class="card sf-mini-stat h-100"><div class="card-body">
-      <div class="sf-mini-value font-display" id="sum-units">—</div><div class="small text-secondary">Units found</div>
-    </div></div></div>
-    <div class="col"><div class="card sf-mini-stat h-100"><div class="card-body">
-      <div class="sf-mini-value font-display" id="sum-questions">—</div><div class="small text-secondary">Questions mapped</div>
-    </div></div></div>
-    <div class="col"><div class="card sf-mini-stat h-100"><div class="card-body">
-      <div class="sf-mini-value font-display" id="sum-topics">—</div><div class="small text-secondary">Topics hit by PYQs</div>
-    </div></div></div>
-    <div class="col"><div class="card sf-mini-stat h-100"><div class="card-body">
-      <div class="sf-mini-value font-display" id="sum-hours">—</div><div class="small text-secondary">Hours allocated</div>
-    </div></div></div>
-  </div>
+    <div class="dsh-views" id="views-row" aria-label="Saved views"></div>
 
-  <div class="row g-4">
-    <!-- Plan -->
-    <div class="col-lg-7">
-      <div class="card h-100" id="panel-plan">
-        <div class="card-header sf-card-head d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-calendar-week me-2 sf-head-icon"></i>Recommended study plan</span>
-          <span class="sf-endpoint-chip">GET /plan</span>
+    <section class="dsh-stats" aria-live="polite" data-reveal>
+      <div class="dsh-stat" style="--sc:var(--blue)"><div class="v" id="sum-units">—</div><div class="l">Units found</div></div>
+      <div class="dsh-stat" style="--sc:var(--amber)"><div class="v" id="sum-questions">—</div><div class="l">Questions mapped</div></div>
+      <div class="dsh-stat" style="--sc:var(--green)"><div class="v" id="sum-topics">—</div><div class="l">Topics hit by PYQs</div></div>
+      <div class="dsh-stat" style="--sc:var(--violet)"><div class="v" id="sum-hours">—</div><div class="l">Hours allocated</div></div>
+    </section>
+
+    <div class="dsh-grid">
+      <section class="dsh-card" id="panel-plan" data-reveal>
+        <div class="dsh-card-head">
+          <span class="t"><i class="bi bi-calendar-week"></i>Recommended study plan</span>
+          <span class="dsh-endpoint dev-only">GET /plan</span>
         </div>
-        <div class="card-body">
+        <div class="dsh-card-body">
           <div data-loading>
-            <div class="d-flex align-items-center gap-2 small text-secondary mb-3">
-              <span class="spinner-border spinner-border-sm"></span>Allocating hours by exam weightage…
-            </div>
-            <div class="placeholder-glow"><span class="placeholder col-12 mb-2"></span><span class="placeholder col-9 mb-2"></span><span class="placeholder col-11 mb-2"></span><span class="placeholder col-7"></span></div>
+            <div class="dsh-loading-note"><span class="dsh-spin"></span><span id="plan-stage">Allocating hours by exam weightage…</span></div>
+            <div class="dsh-skel"><span style="width:100%"></span><span style="width:88%"></span><span style="width:94%"></span><span style="width:70%"></span></div>
           </div>
           <div data-error hidden>
-            <div class="sf-panel-error">
+            <div class="dsh-error">
               <i class="bi bi-exclamation-triangle-fill"></i>
               <div>
                 <strong>Couldn't build the plan.</strong>
-                <p class="small mb-1" data-error-text></p>
-                <p class="small text-secondary mb-2">Common causes: missing <code>GEMINI_API_KEY</code> in <code>.env</code>, API quota/rate limits, or a scanned (image-only) PDF.</p>
-                <button type="button" class="btn btn-outline-ink btn-sm" data-retry="plan"><i class="bi bi-arrow-clockwise me-1"></i>Retry</button>
+                <p data-error-text></p>
+                <details><summary>Technical detail</summary><pre data-error-pre></pre></details>
+                <button class="dsh-btn dsh-btn-ghost" type="button" data-retry="plan"><i class="bi bi-arrow-clockwise"></i>Retry</button>
               </div>
             </div>
           </div>
           <div data-content hidden id="plan-body"></div>
         </div>
-      </div>
-    </div>
+      </section>
 
-    <!-- Weightages -->
-    <div class="col-lg-5">
-      <div class="card h-100" id="panel-weightages">
-        <div class="card-header sf-card-head d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-graph-up-arrow me-2 sf-head-icon"></i>Unit weightage</span>
-          <span class="sf-endpoint-chip">GET /weightages</span>
+      <section class="dsh-card" id="panel-weightages" data-reveal>
+        <div class="dsh-card-head">
+          <span class="t"><i class="bi bi-graph-up-arrow"></i>Unit weightage</span>
+          <span class="dsh-endpoint dev-only">GET /weightages</span>
         </div>
-        <div class="card-body">
+        <div class="dsh-card-body">
           <div data-loading>
-            <div class="d-flex align-items-center gap-2 small text-secondary mb-3">
-              <span class="spinner-border spinner-border-sm"></span>Gemini is reading your PDFs…
-            </div>
-            <div class="placeholder-glow"><span class="placeholder col-12 mb-2"></span><span class="placeholder col-8 mb-2"></span><span class="placeholder col-10 mb-2"></span><span class="placeholder col-6"></span></div>
+            <div class="dsh-loading-note"><span class="dsh-spin"></span>Counting questions per unit…</div>
+            <div class="dsh-skel"><span style="width:100%"></span><span style="width:80%"></span><span style="width:92%"></span><span style="width:60%"></span></div>
           </div>
           <div data-error hidden>
-            <div class="sf-panel-error">
+            <div class="dsh-error">
               <i class="bi bi-exclamation-triangle-fill"></i>
               <div>
                 <strong>Couldn't load weightages.</strong>
-                <p class="small mb-1" data-error-text></p>
-                <button type="button" class="btn btn-outline-ink btn-sm" data-retry="weightages"><i class="bi bi-arrow-clockwise me-1"></i>Retry</button>
+                <p data-error-text></p>
+                <details><summary>Technical detail</summary><pre data-error-pre></pre></details>
+                <button class="dsh-btn dsh-btn-ghost" type="button" data-retry="weightages"><i class="bi bi-arrow-clockwise"></i>Retry</button>
               </div>
             </div>
           </div>
           <div data-content hidden id="weightage-body"></div>
         </div>
-      </div>
+      </section>
     </div>
 
-    <!-- Frequencies -->
-    <div class="col-12">
-      <div class="card" id="panel-frequencies">
-        <div class="card-header sf-card-head d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-bullseye me-2 sf-head-icon"></i>PYQ topic frequencies</span>
-          <span class="sf-endpoint-chip">GET /frequencies</span>
-        </div>
-        <div class="card-body">
-          <div data-loading>
-            <div class="d-flex align-items-center gap-2 small text-secondary mb-3">
-              <span class="spinner-border spinner-border-sm"></span>Counting how often each topic appeared…
-            </div>
-            <div class="placeholder-glow"><span class="placeholder col-11 mb-2"></span><span class="placeholder col-9 mb-2"></span><span class="placeholder col-12 mb-2"></span><span class="placeholder col-7"></span></div>
-          </div>
-          <div data-error hidden>
-            <div class="sf-panel-error">
-              <i class="bi bi-exclamation-triangle-fill"></i>
-              <div>
-                <strong>Couldn't load frequencies.</strong>
-                <p class="small mb-1" data-error-text></p>
-                <button type="button" class="btn btn-outline-ink btn-sm" data-retry="frequencies"><i class="bi bi-arrow-clockwise me-1"></i>Retry</button>
-              </div>
-            </div>
-          </div>
-          <div data-content hidden id="freq-body"></div>
-        </div>
+    <section class="dsh-card" id="panel-frequencies" data-reveal>
+      <div class="dsh-card-head">
+        <span class="t"><i class="bi bi-bullseye"></i>PYQ topic frequencies</span>
+        <span class="dsh-endpoint dev-only">GET /frequencies</span>
       </div>
-    </div>
+      <div class="dsh-card-body">
+        <div data-loading>
+          <div class="dsh-loading-note"><span class="dsh-spin"></span>Ranking topics by appearance…</div>
+          <div class="dsh-skel"><span style="width:96%"></span><span style="width:84%"></span><span style="width:90%"></span><span style="width:66%"></span></div>
+        </div>
+        <div data-error hidden>
+          <div class="dsh-error">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <div>
+              <strong>Couldn't load frequencies.</strong>
+              <p data-error-text></p>
+              <details><summary>Technical detail</summary><pre data-error-pre></pre></details>
+              <button class="dsh-btn dsh-btn-ghost" type="button" data-retry="frequencies"><i class="bi bi-arrow-clockwise"></i>Retry</button>
+            </div>
+          </div>
+        </div>
+        <div data-content hidden id="freq-body"></div>
+      </div>
+    </section>
+
+    <p class="dsh-foot"><i class="bi bi-plug"></i>Values render exactly as returned by the analysis engine — click any unit or topic for a focused breakdown.</p>
   </div>
+</div>
 
-  <p class="small text-secondary mt-4 mb-0"><i class="bi bi-plug me-1"></i>Data source: the live JSON API on this server. Values are rendered exactly as returned — nothing is hardcoded.</p>
+<div class="dsh-scrim" id="scrim" hidden></div>
+<aside class="dsh-drawer dsh-scroll" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden>
+  <div class="dsh-drawer-head">
+    <h2 id="drawer-title">Details</h2>
+    <button class="dsh-drawer-close" id="drawer-close" type="button" aria-label="Close details"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="dsh-drawer-body" id="drawer-body"></div>
+</aside>
+
+<div class="dsh-toast" id="toast" role="status" hidden>
+  <span id="toast-msg"></span>
+  <button id="toast-undo" type="button" hidden>Undo</button>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='/js/dashboard.js') }}"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var CHART = ["#2F6FED", "#FFB703", "#0E9F6E", "#7C5CFF", "#0EA5A5", "#D6409F", "#E5484D", "#14213D"];
+  var LS_VIEWS = "sf_views_v1", LS_FRESH = "sf_fresh_v1";
+
+  var state = {
+    hours: 20, sort: "count-desc", query: "", topN: "8", view: "bars",
+    w: null, f: null, p: null, source: null, busy: false,
+    views: [], lastDeleted: null, controllers: {}
+  };
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function debounce(fn, ms) {
+    var t; return function () { var a = arguments, c = this; clearTimeout(t); t = setTimeout(function () { fn.apply(c, a); }, ms); };
+  }
+  function num(v, d) { v = Number(v); return isFinite(v) ? v : (d || 0); }
+  function fetchJSON(url, key) {
+    if (state.controllers[key]) state.controllers[key].abort();
+    var ctl = new AbortController(); state.controllers[key] = ctl;
+    return fetch(url, { signal: ctl.signal }).then(function (r) {
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (j) {
+        throw new Error(j.detail || ("HTTP " + r.status));
+      });
+      return r.json();
+    });
+  }
+  function panel(id, mode) {
+    var root = $("#" + id);
+    ["loading", "error", "content"].forEach(function (m) {
+      var el = root.querySelector("[data-" + m + "]");
+      if (el) el.hidden = (m !== mode);
+    });
+  }
+  function showError(id, err) {
+    var root = $("#" + id);
+    root.querySelector("[data-error-text]").textContent =
+      "The analysis service didn't respond. This is usually temporary — retry in a moment.";
+    root.querySelector("[data-error-pre]").textContent = String(err && err.message || err);
+    panel(id, "error");
+  }
+  function toast(msg, undoFn) {
+    var t = $("#toast"), u = $("#toast-undo");
+    $("#toast-msg").textContent = msg;
+    u.hidden = !undoFn;
+    u.onclick = undoFn ? function () { undoFn(); hideToast(); } : null;
+    t.hidden = false; requestAnimationFrame(function () { t.classList.add("show"); });
+    clearTimeout(toast._t); toast._t = setTimeout(hideToast, 6000);
+  }
+  function hideToast() { var t = $("#toast"); t.classList.remove("show"); setTimeout(function () { t.hidden = true; }, 250); }
+  function relTime(ts) {
+    if (!ts) return "—";
+    var s = Math.max(0, (Date.now() - ts) / 1000);
+    if (s < 60) return "just now";
+    if (s < 3600) return Math.floor(s / 60) + " min ago";
+    if (s < 86400) return Math.floor(s / 3600) + " h ago";
+    return new Date(ts).toLocaleDateString();
+  }
+  function stampFresh() {
+    var ts = Date.now();
+    try { localStorage.setItem(LS_FRESH, String(ts)); } catch (e) {}
+    $("#fresh-text").textContent = "updated " + relTime(ts);
+  }
+
+  function loadWeightages() {
+    panel("panel-weightages", "loading");
+    return fetchJSON("/weightages", "w").then(function (d) {
+      state.w = d || {}; panel("panel-weightages", "content"); renderWeightages(); renderSummary();
+    }).catch(function (e) { if (e.name !== "AbortError") showError("panel-weightages", e); });
+  }
+  function loadFrequencies() {
+    panel("panel-frequencies", "loading");
+    return fetchJSON("/frequencies", "f").then(function (d) {
+      state.f = d || {}; panel("panel-frequencies", "content"); renderFrequencies(); renderSummary();
+    }).catch(function (e) { if (e.name !== "AbortError") showError("panel-frequencies", e); });
+  }
+  function loadPlan() {
+    panel("panel-plan", "loading"); setPlanBusy(true);
+    return fetchJSON("/plan?hours=" + state.hours, "p").then(function (d) {
+      state.p = d || {}; panel("panel-plan", "content"); renderPlan(); renderSummary(); syncExport();
+    }).catch(function (e) { if (e.name !== "AbortError") showError("panel-plan", e); })
+      .finally(function () { setPlanBusy(false); });
+  }
+  function loadStatus() {
+    return fetchJSON("/status", "s").then(function (d) {
+      state.source = d.source; renderSource(); return d;
+    }).catch(function () { state.source = null; renderSource(); return null; });
+  }
+  function refreshAll() {
+    return Promise.all([loadWeightages(), loadFrequencies(), loadPlan()]).then(stampFresh);
+  }
+  function setPlanBusy(b) {
+    $("#plan-spin").hidden = !b; $("#plan-icon").hidden = b;
+    $("#plan-label").textContent = b ? "Rebuilding…" : "Rebuild plan";
+    $("#rebuild-btn").disabled = b;
+  }
+  function syncExport() {
+    var a = $("#export-link");
+    a.href = "/export-pdf?hours=" + state.hours;
+    var ok = !!state.p && Object.keys(state.p).length > 0;
+    a.setAttribute("aria-disabled", ok ? "false" : "true");
+    a.style.opacity = ok ? "1" : ".5"; a.style.pointerEvents = ok ? "auto" : "none";
+  }
+  function renderSource() {
+    var pill = $("#source-pill"), txt = $("#source-text");
+    pill.classList.remove("is-sample", "is-busy");
+    if (state.busy) { pill.classList.add("is-busy"); txt.textContent = "Analysing…"; }
+    else if (state.source === "sample") { pill.classList.add("is-sample"); txt.textContent = "Sample data"; }
+    else if (state.source) { txt.textContent = "Analysed data"; }
+    else { txt.textContent = "Live API"; }
+  }
+
+  function renderSummary() {
+    var w = state.w || {}, f = state.f || {}, p = state.p || {};
+    var q = Object.keys(w).reduce(function (s, k) { return s + num(w[k]); }, 0);
+    var h = Object.keys(p).reduce(function (s, k) { return s + num(p[k].recommended_hours); }, 0);
+    $("#sum-units").textContent = Object.keys(w).length || "—";
+    $("#sum-questions").textContent = q || "—";
+    $("#sum-topics").textContent = Object.keys(f).length || "—";
+    $("#sum-hours").textContent = h ? h.toFixed(1) : "—";
+  }
+  function renderWeightages() {
+    var body = $("#weightage-body"), w = state.w || {};
+    var entries = Object.keys(w).map(function (k) { return [k, num(w[k])]; })
+      .sort(function (a, b) { return b[1] - a[1]; });
+    if (!entries.length) {
+      body.innerHTML = '<div class="dsh-empty"><i class="bi bi-inboxes"></i>No units mapped yet.<br>Run Re-analyse to populate.</div>';
+      return;
+    }
+    var total = entries.reduce(function (s, e) { return s + e[1]; }, 0) || 1;
+    var max = entries[0][1] || 1;
+    body.innerHTML = '<div class="dsh-bars">' + entries.map(function (e, i) {
+      var pct = (e[1] / total * 100).toFixed(1);
+      return '<button class="dsh-bar" type="button" data-unit="' + esc(e[0]) + '" style="--bc:' + CHART[i % CHART.length] + '">' +
+        '<span class="row"><span class="name">' + esc(e[0]) + '</span>' +
+        '<span class="val">' + e[1] + ' question' + (e[1] === 1 ? "" : "s") + ' · ' + pct + '%</span></span>' +
+        '<span class="track"><span class="fill" data-w="' + (e[1] / max * 100).toFixed(1) + '"></span></span></button>';
+    }).join("") + '</div>';
+    requestAnimationFrame(function () {
+      $$(".fill", body).forEach(function (el) { el.style.width = el.getAttribute("data-w") + "%"; });
+    });
+    $$(".dsh-bar", body).forEach(function (btn) {
+      btn.addEventListener("click", function () { openUnitDrawer(btn.getAttribute("data-unit")); });
+    });
+  }
+  function freqEntries() {
+    var f = state.f || {};
+    var list = Object.keys(f).map(function (k) { return [k, num(f[k])]; });
+    if (state.query) {
+      var q = state.query.toLowerCase();
+      list = list.filter(function (e) { return e[0].toLowerCase().indexOf(q) !== -1; });
+    }
+    if (state.sort === "count-desc") list.sort(function (a, b) { return b[1] - a[1] || a[0].localeCompare(b[0]); });
+    if (state.sort === "count-asc") list.sort(function (a, b) { return a[1] - b[1] || a[0].localeCompare(b[0]); });
+    if (state.sort === "name-asc") list.sort(function (a, b) { return a[0].localeCompare(b[0]); });
+    if (state.topN !== "all") list = list.slice(0, parseInt(state.topN, 10));
+    return list;
+  }
+  function renderFrequencies() {
+    var body = $("#freq-body"), list = freqEntries();
+    var all = state.f || {};
+    var total = Object.keys(all).reduce(function (s, k) { return s + num(all[k]); }, 0) || 1;
+    if (!list.length) {
+      body.innerHTML = '<div class="dsh-empty"><i class="bi bi-search"></i>' +
+        (state.query ? 'No topics match "' + esc(state.query) + '".' : 'No topic frequencies yet.') +
+        '<br><button class="dsh-btn dsh-btn-ghost" type="button" id="freq-clear" style="margin-top:10px">Clear search</button></div>';
+      var c = $("#freq-clear"); if (c) c.addEventListener("click", function () { state.query = ""; $("#freq-search").value = ""; renderFrequencies(); });
+      return;
+    }
+    var max = Math.max.apply(null, list.map(function (e) { return e[1]; })) || 1;
+    if (state.view === "table") {
+      body.innerHTML = '<div class="dsh-tablewrap dsh-scroll"><table class="dsh-table"><thead><tr>' +
+        '<th>#</th><th>Topic</th><th>Appearances</th><th>Share</th></tr></thead><tbody>' +
+        list.map(function (e, i) {
+          return '<tr data-topic="' + esc(e[0]) + '"><td>' + (i + 1) + '</td><td style="font-weight:700;color:var(--ink)">' +
+            esc(e[0]) + '</td><td>' + e[1] + '</td><td>' + (e[1] / total * 100).toFixed(1) + '%</td></tr>';
+        }).join("") + '</tbody></table></div>';
+      $$("tbody tr", body).forEach(function (tr) {
+        tr.addEventListener("click", function () { openTopicDrawer(tr.getAttribute("data-topic")); });
+      });
+      return;
+    }
+    body.innerHTML = '<div class="dsh-freq">' + list.map(function (e, i) {
+      return '<button class="dsh-freq-item" type="button" data-topic="' + esc(e[0]) + '">' +
+        '<span class="dsh-rank">' + (i + 1) + '</span>' +
+        '<span><span class="name">' + esc(e[0]) + '</span>' +
+        '<span class="track"><span class="fill" data-w="' + (e[1] / max * 100).toFixed(1) + '"></span></span></span>' +
+        '<span class="dsh-count">×' + e[1] + '</span></button>';
+    }).join("") + '</div>';
+    requestAnimationFrame(function () {
+      $$(".fill", body).forEach(function (el) { el.style.width = el.getAttribute("data-w") + "%"; });
+    });
+    $$(".dsh-freq-item", body).forEach(function (btn) {
+      btn.addEventListener("click", function () { openTopicDrawer(btn.getAttribute("data-topic")); });
+    });
+  }
+  function renderPlan() {
+    var body = $("#plan-body"), p = state.p || {};
+    var keys = Object.keys(p);
+    if (!keys.length) {
+      body.innerHTML = '<div class="dsh-empty"><i class="bi bi-calendar-x"></i>No plan available yet.</div>';
+      return;
+    }
+    var rows = keys.map(function (k) {
+      var r = p[k] || {};
+      return { unit: k, q: num(r.questions_appeared), w: num(r.weightage_percentage), h: num(r.recommended_hours) };
+    });
+    var maxH = Math.max.apply(null, rows.map(function (r) { return r.h; })) || 1;
+    var tq = rows.reduce(function (s, r) { return s + r.q; }, 0);
+    var tw = rows.reduce(function (s, r) { return s + r.w; }, 0);
+    var th = rows.reduce(function (s, r) { return s + r.h; }, 0);
+    body.innerHTML = '<div class="dsh-loading-note" style="margin-bottom:12px"><span class="dsh-hchip">' + state.hours +
+      ' h</span><span>allocated by exam weightage</span></div>' +
+      '<div class="dsh-tablewrap dsh-scroll"><table class="dsh-table"><thead><tr>' +
+      '<th>Unit</th><th>PYQs</th><th>Weightage</th><th>Recommended</th></tr></thead><tbody>' +
+      rows.map(function (r, i) {
+        return '<tr data-unit="' + esc(r.unit) + '" class="' + (r.h === maxH ? "is-top" : "") + '">' +
+          '<td style="font-weight:700;color:var(--ink)">' + esc(r.unit) +
+          '<span class="dsh-minibar" style="--bc:' + CHART[i % CHART.length] + '"><i style="width:' + (r.h / maxH * 100).toFixed(1) + '%"></i></span></td>' +
+          '<td>' + r.q + '</td><td>' + r.w.toFixed(1) + '%</td>' +
+          '<td><span class="dsh-hchip">' + r.h.toFixed(1) + ' h</span></td></tr>';
+      }).join("") + '</tbody><tfoot><tr><td>Total</td><td>' + tq + '</td><td>' + tw.toFixed(1) + '%</td><td>' + th.toFixed(1) + ' h</td></tr></tfoot></table></div>';
+    $$("tbody tr", body).forEach(function (tr) {
+      tr.addEventListener("click", function () { openUnitDrawer(tr.getAttribute("data-unit")); });
+    });
+  }
+
+  var lastFocus = null;
+  function openDrawer(title, html) {
+    lastFocus = document.activeElement;
+    $("#drawer-title").textContent = title;
+    $("#drawer-body").innerHTML = html;
+    var d = $("#drawer"), s = $("#scrim");
+    d.hidden = false; s.hidden = false;
+    requestAnimationFrame(function () { d.classList.add("show"); s.classList.add("show"); });
+    $("#drawer-close").focus();
+  }
+  function closeDrawer() {
+    var d = $("#drawer"), s = $("#scrim");
+    d.classList.remove("show"); s.classList.remove("show");
+    setTimeout(function () { d.hidden = true; s.hidden = true; }, 280);
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  function kv(v, l) { return '<div class="cell"><div class="v">' + v + '</div><div class="l">' + l + '</div></div>'; }
+  function openUnitDrawer(unit) {
+    var w = state.w || {}, p = state.p || {};
+    var count = num(w[unit]);
+    var total = Object.keys(w).reduce(function (s, k) { return s + num(w[k]); }, 0) || 1;
+    var r = p[unit] || {};
+    var share = (count / total * 100).toFixed(1);
+    openDrawer(unit, '<div class="dsh-kv">' +
+      kv(count, "PYQs mapped") + kv(share + "%", "Exam share") +
+      kv(num(r.recommended_hours).toFixed(1) + " h", "Recommended now") +
+      kv(num(r.weightage_percentage).toFixed(1) + "%", "Plan weightage") + '</div>' +
+      '<div class="dsh-tip"><strong><i class="bi bi-lightbulb"></i>Study strategy</strong>' +
+      (share >= 30 ? "This unit dominates the paper. Start here and secure its high-mark questions before touching lighter units."
+        : share >= 15 ? "A solid mid-weight unit. Schedule it after the heaviest unit while your recall is still sharp."
+          : "A lighter unit. Cover it in short, spaced sessions rather than long blocks.") + '</div>');
+  }
+  function openTopicDrawer(topic) {
+    var f = state.f || {};
+    var count = num(f[topic]);
+    var total = Object.keys(f).reduce(function (s, k) { return s + num(f[k]); }, 0) || 1;
+    var rank = Object.keys(f).sort(function (a, b) { return num(f[b]) - num(f[a]); }).indexOf(topic) + 1;
+    var hours = (count / total * state.hours).toFixed(1);
+    openDrawer(topic, '<div class="dsh-kv">' +
+      kv("×" + count, "Appearances") + kv("#" + rank, "Rank by frequency") +
+      kv((count / total * 100).toFixed(1) + "%", "Share of PYQs") + kv(hours + " h", "Proportional hours") + '</div>' +
+      '<div class="dsh-tip"><strong><i class="bi bi-lightbulb"></i>Revision tip</strong>' +
+      (count >= 3 ? "A repeat favourite — practise past answers verbatim and memorise the standard diagram or derivation."
+        : count === 2 ? "Appears regularly. Prepare one model answer and one variant so you are covered either way."
+          : "Appeared once. Read it once for awareness; don't spend prime revision time here.") + '</div>');
+  }
+
+  function loadViews() {
+    try {
+      var raw = localStorage.getItem(LS_VIEWS);
+      state.views = raw ? JSON.parse(raw) : null;
+    } catch (e) { state.views = null; }
+    if (!state.views || !state.views.length) {
+      state.views = [
+        { id: "v-crunch", name: "Crunch week", hours: 10, sort: "count-desc", query: "", topN: "5", view: "bars" },
+        { id: "v-full", name: "Full revision", hours: 40, sort: "count-desc", query: "", topN: "all", view: "table" }
+      ];
+      persistViews();
+    }
+    renderViews();
+  }
+  function persistViews() { try { localStorage.setItem(LS_VIEWS, JSON.stringify(state.views)); } catch (e) {} }
+  function renderViews() {
+    var row = $("#views-row");
+    row.innerHTML = '<span class="dsh-views-label">Saved views</span>' + state.views.map(function (v) {
+      return '<span class="dsh-view"><button class="apply" type="button" data-id="' + esc(v.id) + '" title="Apply view">' +
+        esc(v.name) + ' · ' + v.hours + 'h</button>' +
+        '<button type="button" data-del="' + esc(v.id) + '" aria-label="Delete view ' + esc(v.name) + '">×</button></span>';
+    }).join("");
+    $$(".apply", row).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var v = state.views.filter(function (x) { return x.id === b.getAttribute("data-id"); })[0];
+        if (!v) return;
+        state.hours = v.hours; state.sort = v.sort; state.query = v.query; state.topN = v.topN; state.view = v.view;
+        syncControls(); renderFrequencies(); loadPlan();
+        toast('Applied "' + v.name + '"');
+      });
+    });
+    $$("[data-del]", row).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var id = b.getAttribute("data-del");
+        var idx = state.views.findIndex(function (x) { return x.id === id; });
+        if (idx < 0) return;
+        state.lastDeleted = { item: state.views[idx], index: idx };
+        state.views.splice(idx, 1); persistViews(); renderViews();
+        toast("View deleted", function () {
+          if (!state.lastDeleted) return;
+          state.views.splice(state.lastDeleted.index, 0, state.lastDeleted.item);
+          state.lastDeleted = null; persistViews(); renderViews();
+        });
+      });
+    });
+  }
+  function syncControls() {
+    $("#hours-input").value = state.hours;
+    $("#hours-range").value = Math.min(120, state.hours);
+    $("#freq-sort").value = state.sort;
+    $("#freq-topn").value = state.topN;
+    $("#freq-search").value = state.query;
+    $$(".dsh-presets .dsh-chipbtn").forEach(function (b) {
+      b.classList.toggle("is-active", parseInt(b.getAttribute("data-hours"), 10) === state.hours);
+    });
+    $("#view-bars").classList.toggle("is-active", state.view === "bars");
+    $("#view-table").classList.toggle("is-active", state.view === "table");
+    $("#view-bars").setAttribute("aria-pressed", state.view === "bars");
+    $("#view-table").setAttribute("aria-pressed", state.view === "table");
+    syncExport();
+  }
+
+  function reanalyse() {
+    if (state.busy) return;
+    state.busy = true; renderSource();
+    $("#refresh-spin").hidden = false; $("#refresh-icon").hidden = true;
+    $("#refresh-label").textContent = "Analysing…"; $("#refresh-btn").disabled = true;
+    var stages = ["Reading syllabus…", "Extracting questions…", "Mapping topics…", "Allocating hours…"];
+    var si = 0;
+    var stageTimer = setInterval(function () {
+      si = (si + 1) % stages.length;
+      var el = $("#plan-stage"); if (el) el.textContent = stages[si];
+    }, 2500);
+    fetchJSON("/refresh", "r").catch(function () {}).then(function () {
+      var tries = 0;
+      var poll = setInterval(function () {
+        tries++;
+        loadStatus().then(function (d) {
+          if ((d && d.ready) || tries > 40) {
+            clearInterval(poll); clearInterval(stageTimer);
+            state.busy = false; renderSource();
+            $("#refresh-spin").hidden = true; $("#refresh-icon").hidden = false;
+            $("#refresh-label").textContent = "Re-analyse"; $("#refresh-btn").disabled = false;
+            refreshAll().then(function () { toast("Analysis updated"); });
+          }
+        });
+      }, 3000);
+    });
+  }
+
+  function setHours(v, refetch) {
+    v = Math.max(1, Math.min(500, Math.round(num(v, 20))));
+    state.hours = v; syncControls();
+    if (refetch) loadPlan();
+  }
+  var debouncedPlan = debounce(function () { loadPlan(); }, 450);
+
+  $("#hours-input").addEventListener("input", function () { setHours(this.value, false); debouncedPlan(); });
+  $("#hours-range").addEventListener("input", function () { setHours(this.value, false); debouncedPlan(); });
+  $$(".dsh-presets .dsh-chipbtn").forEach(function (b) {
+    b.addEventListener("click", function () { setHours(b.getAttribute("data-hours"), true); });
+  });
+  $("#rebuild-btn").addEventListener("click", function () { loadPlan(); });
+  $("#refresh-btn").addEventListener("click", reanalyse);
+  $("#freq-search").addEventListener("input", debounce(function () { state.query = this.value.trim(); renderFrequencies(); }, 200));
+  $("#freq-sort").addEventListener("change", function () { state.sort = this.value; renderFrequencies(); });
+  $("#freq-topn").addEventListener("change", function () { state.topN = this.value; renderFrequencies(); });
+  $("#view-bars").addEventListener("click", function () { state.view = "bars"; syncControls(); renderFrequencies(); });
+  $("#view-table").addEventListener("click", function () { state.view = "table"; syncControls(); renderFrequencies(); });
+  $("#reset-filters").addEventListener("click", function () {
+    state.query = ""; state.sort = "count-desc"; state.topN = "8"; state.view = "bars";
+    syncControls(); renderFrequencies(); toast("Filters reset");
+  });
+  $("#dev-toggle").addEventListener("click", function () {
+    var on = document.body.classList.toggle("dev-on");
+    this.setAttribute("aria-pressed", on);
+  });
+  $("#save-view-btn").addEventListener("click", function () {
+    var p = $("#save-form"); p.hidden = !p.hidden;
+    if (!p.hidden) $("#view-name").focus();
+  });
+  $("#save-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var name = $("#view-name").value.trim() || ("View " + (state.views.length + 1));
+    state.views.push({
+      id: "v-" + Date.now(), name: name, hours: state.hours, sort: state.sort,
+      query: state.query, topN: state.topN, view: state.view
+    });
+    persistViews(); renderViews();
+    $("#view-name").value = ""; this.hidden = true;
+    toast('Saved "' + name + '"');
+  });
+  $$("[data-retry]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var k = b.getAttribute("data-retry");
+      if (k === "plan") loadPlan();
+      if (k === "weightages") loadWeightages();
+      if (k === "frequencies") loadFrequencies();
+    });
+  });
+  $("#drawer-close").addEventListener("click", closeDrawer);
+  $("#scrim").addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { closeDrawer(); $("#save-form").hidden = true; }
+  });
+  document.addEventListener("click", function (e) {
+    var pop = $("#save-form");
+    if (!pop.hidden && !pop.contains(e.target) && e.target !== $("#save-view-btn") && !$("#save-view-btn").contains(e.target)) {
+      pop.hidden = true;
+    }
+  });
+
+  try { $("#fresh-text").textContent = "updated " + relTime(parseInt(localStorage.getItem(LS_FRESH), 10)); } catch (e) {}
+  loadViews(); syncControls();
+  loadStatus().then(function (d) {
+    refreshAll().then(function () {
+      if (d && !d.ready) {
+        var tries = 0;
+        var poll = setInterval(function () {
+          tries++;
+          loadStatus().then(function (s) {
+            if ((s && s.ready) || tries > 40) {
+              clearInterval(poll);
+              if (s && s.ready) refreshAll().then(function () { toast("Real analysis loaded"); });
+            }
+          });
+        }, 4000);
+      }
+    });
+  });
+  setInterval(function () {
+    try { $("#fresh-text").textContent = "updated " + relTime(parseInt(localStorage.getItem(LS_FRESH), 10)); } catch (e) {}
+  }, 30000);
+})();
+</script>
 {% endblock %}

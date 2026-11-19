@@ -1,59 +1,64 @@
 import os
 import json
+import time
+
 
 def _load_credentials():
-    # 1. Try Streamlit Secrets first (only works if running in Streamlit AND secrets exist)
     try:
         import streamlit as st
-        # st.secrets throws an error if the file is missing, so we catch ALL exceptions here
-        api_key = st.secrets.get("GEMINI_API_KEY", "")
-        model = st.secrets.get("GEMINI_MODEL", "gemini-flash-latest")
-        if api_key:
-            return api_key, model
+        k = st.secrets.get("GEMINI_API_KEY", "")
+        if k:
+            return k
     except Exception:
-        pass  # Not in Streamlit, or no secrets file. Fall back to .env.
-
-    # 2. Fallback to local .env file (for FastAPI local development)
+        pass
     try:
         from dotenv import load_dotenv
         load_dotenv()
     except ImportError:
         pass
-    
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
-    
-    return api_key, model
+    return os.getenv("GEMINI_API_KEY", "")
 
-api_key, MODEL = _load_credentials()
 
+api_key = _load_credentials()
 if not api_key:
-    raise RuntimeError("GEMINI_API_KEY missing. Check your .env file or Streamlit Secrets.")
+    raise RuntimeError("GEMINI_API_KEY missing. Set it in .env / Render env / Streamlit Secrets.")
 
 from google import genai
 from google.genai import types
 
-# Create client once globally to prevent connection closures
-client = genai.Client(
-    api_key=api_key,
-    http_options=types.HttpOptions(timeout=60000),
-)
+client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=60000))
+
+# Try these in order; 404 skips to the next, 503/429 retries with backoff.
+_default = "gemini-flash-latest,gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash"
+_models = os.getenv("GEMINI_MODELS", _default)
+_single = os.getenv("GEMINI_MODEL", "")
+CANDIDATE_MODELS = list(dict.fromkeys(([ _single ] if _single else []) + [m.strip() for m in _models.split(",") if m.strip()]))
 
 
 def _generate_json(prompt):
-    try:
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
-        return response.text
-    except Exception as e:
-        raise RuntimeError(f"Gemini call failed: {type(e).__name__}: {e}")
+    last_err = None
+    for model in CANDIDATE_MODELS:
+        for attempt in range(3):
+            try:
+                resp = client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(response_mime_type="application/json"),
+                )
+                return resp.text
+            except Exception as e:
+                msg = str(e)
+                last_err = e
+                if "404" in msg or "NOT_FOUND" in msg:
+                    break                      # model unavailable -> next model
+                if any(s in msg for s in ("429", "503", "504", "UNAVAILABLE", "DEADLINE", "RESOURCE_EXHAUSTED")):
+                    time.sleep(2 ** attempt * 2)   # 2s, 4s, 8s backoff
+                    continue
+                raise RuntimeError(f"Gemini call failed: {type(e).__name__}: {e}")
+    raise RuntimeError(f"All models failed after retries: {last_err}")
 
 
 def extract_topics(syllabus_text):
-    """Send syllabus text to Gemini. Return a validated list of topic dicts."""
     prompt = f"""Extract the study topics from this syllabus.
 Return ONLY JSON in this format:
 {{"topics": [{{"name": "...", "unit": "...", "estimated_hours": 2, "difficulty": "easy"}}]}}
@@ -78,7 +83,6 @@ def _validate_topics(raw_text):
 
 
 def extract_questions(pyq_text):
-    """Send PYQ text to Gemini. Return a validated list of question dicts."""
     prompt = f"""Extract every exam question from this question paper.
 Return ONLY JSON in this format:
 {{"questions": [{{"question_text": "...", "year": 2023, "marks": 5}}]}}
@@ -101,10 +105,8 @@ QUESTION PAPER:
 
 
 def map_questions_to_topics(questions, topics):
-    """Return a dict: question index -> topic index (-1 means no match)."""
     topic_list = "\n".join(f"{i}: {t['name']}" for i, t in enumerate(topics))
     question_list = "\n".join(f"{i}: {q['question_text']}" for i, q in enumerate(questions))
-
     prompt = f"""Match each exam question to the syllabus topic it belongs to.
 Return ONLY JSON in this format:
 {{"mappings": [{{"question_index": 0, "topic_index": 0}}]}}
@@ -128,7 +130,6 @@ QUESTIONS:
             result[qi] = ti
     except Exception as e:
         raise ValueError(f"Bad AI output: {e}")
-
     for qi in range(len(questions)):
         result.setdefault(qi, -1)
     return result
