@@ -74,7 +74,7 @@ def _build_prompt(msgs):
 def _stream_groq(prompt):
     r = requests.post(
         GROQ_URL,
-        headers={"Authorization": f"Bearer {_secret('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')}"},
+        headers={"Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}"},
         json={
             "model": "llama-3.1-8b-instant",  # HARDCODED: Current active Groq model
             "messages": [{"role": "user", "content": prompt}],
@@ -107,7 +107,7 @@ def _stream_groq(prompt):
 def _stream_gemini(prompt):
     from google import genai
     from google.genai import types
-    client = genai.Client(api_key=_secret("AQ.Ab8RN6LfWQZ2z3r9gDKx4wSfp5OqYhgYbSoAnP4RK5hHPjMdhg"),
+    client = genai.Client(api_key=os.getenv("AQ.GEMINI_API_KEY"),
                           http_options=types.HttpOptions(timeout=60000))
     for chunk in client.models.generate_content_stream(
         model="gemini-3.8-flash",  # HARDCODED: Exact model Google told us to use

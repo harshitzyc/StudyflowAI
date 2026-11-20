@@ -5,3 +5,5 @@ __pycache__/
 uploads/
 .vscode/
 study_plan_report.pdf
+*.pyc
+analysis_cache.json
